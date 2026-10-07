@@ -65,6 +65,33 @@ AI copilot for RTI request drafting and filing assistance.
 🚧 Early-stage / Month 1 of OJT — architecture and core drafting flow in
 progress. This README will be updated as further milestones are completed.
 
+## Running locally
+
+Copy `.env.example` to `.env` first. Never commit `.env`.
+
+**Frontend** (React + Vite):
+
+```
+npm install
+npm run dev
+```
+
+With `VITE_API_URL` unset the UI runs on built-in mock data and needs no
+backend.
+
+**Backend** (FastAPI, in `backend/`):
+
+```
+cd backend
+python -m venv .venv
+.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload   # http://localhost:8000, docs at /docs
+pytest
+```
+
+Or run the API together with PostgreSQL + pgvector: `docker compose up`.
+
 ## References
 
 - [Right to Information portal](https://rti.gov.in/)

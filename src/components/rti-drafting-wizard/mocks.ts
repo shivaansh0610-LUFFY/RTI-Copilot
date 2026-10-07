@@ -1,15 +1,37 @@
 import type { InformationRequest } from "../../types";
 
-// Mock backend calls — each is a single async function so it's a one-line
-// swap for a real API call later. Replace the body, keep the signature.
+// Backend calls — each is a single async function. The ones still mocked are a
+// one-line swap for a real API call later: replace the body, keep the signature.
 
 const DEFAULT_AUTHORITY = "Public Works Department (PWD), Ward Division Office";
 
-// Replace with: POST /cases/:id/decompose
+// Unset means "run on the built-in mock data without the backend".
+const API_URL: string | undefined = import.meta.env.VITE_API_URL;
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`POST ${path} failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+// POST /cases, then POST /cases/:id/decompose
 export async function decomposeGrievance(
-  _grievance: string,
+  grievance: string,
   clarification: Record<string, string>,
 ): Promise<InformationRequest[]> {
+  if (API_URL) {
+    const { caseId } = await postJson<{ caseId: string }>("/cases", {
+      grievanceText: grievance,
+    });
+    return postJson<InformationRequest[]>(`/cases/${caseId}/decompose`, { clarification });
+  }
+
   const period = clarification.period ?? "Last 1 year";
   return [
     {
