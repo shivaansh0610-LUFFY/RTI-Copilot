@@ -67,7 +67,8 @@ progress. This README will be updated as further milestones are completed.
 
 ## Running locally
 
-Copy `.env.example` to `.env` first. Never commit `.env`.
+Copy `.env.example` to `.env` first and set `POSTGRES_PASSWORD` (and the
+matching `DATABASE_URL`) to a password of your own. Never commit `.env`.
 
 **Frontend** (React + Vite):
 
