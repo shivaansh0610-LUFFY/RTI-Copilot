@@ -1,11 +1,13 @@
-import { AlertTriangle, FileUp, Loader2 } from "lucide-react";
+import { AlertTriangle, FilePlus2, FileUp, Loader2 } from "lucide-react";
+import { useState } from "react";
 import type {
+  ClassificationLabel,
   ClassificationResult,
+  FollowUpContext,
   InformationRequest,
   ResponsePassage,
-  ReviewVerdict,
 } from "../../types";
-import { LABEL_BADGE_CLASSES, LABEL_TEXT } from "./constants";
+import { FOLLOW_UP_LABELS, LABEL_BADGE_CLASSES, LABEL_TEXT, NEXT_STEP_HINT } from "./constants";
 import { PrimaryButton, SecondaryButton } from "./ui";
 
 export function UploadStep({
@@ -140,30 +142,15 @@ export function AlignStep({
 export function ClassificationCard({
   request,
   result,
-  reviewSlot,
-  reviewed,
 }: {
   request: InformationRequest;
   result: ClassificationResult;
-  reviewSlot?: React.ReactNode;
-  reviewed?: boolean;
 }) {
   return (
-    <div
-      className={
-        "rounded-md border border-slate-200 p-4 " + (reviewed ? "bg-slate-50" : "")
-      }
-    >
+    <div className="rounded-md border border-slate-200 p-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium text-slate-900">{request.title}</p>
-        <span
-          className={
-            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium " +
-            LABEL_BADGE_CLASSES[result.label]
-          }
-        >
-          {LABEL_TEXT[result.label]}
-        </span>
+        <LabelBadge label={result.label} />
       </div>
       <p className="text-sm text-slate-600">{result.explanation}</p>
       {result.label === "INSUFFICIENT_EVIDENCE" && result.abstentionReason && (
@@ -181,7 +168,6 @@ export function ClassificationCard({
           ))}
         </div>
       )}
-      {reviewSlot}
     </div>
   );
 }
@@ -204,74 +190,27 @@ export function ClassifyStep({
   );
 }
 
-const VERDICT_LABELS: { value: ReviewVerdict; label: string }[] = [
-  { value: "agree", label: "Agree" },
-  { value: "disagree", label: "Disagree" },
-  { value: "evidence-incorrect", label: "Evidence incorrect" },
-];
-
-export function ReviewStep({
-  requests,
-  results,
-  verdicts,
-  onVerdict,
-}: {
-  requests: InformationRequest[];
-  results: Record<string, ClassificationResult>;
-  verdicts: Record<string, ReviewVerdict>;
-  onVerdict: (requestId: string, verdict: ReviewVerdict) => void;
-}) {
-  const reviewedCount = Object.keys(verdicts).length;
+function LabelBadge({ label }: { label: ClassificationLabel }) {
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-slate-500">
-        {reviewedCount} of {requests.length} reviewed
-      </p>
-      {requests.map((request) => {
-        const result = results[request.id];
-        if (!result) return null;
-        const verdict = verdicts[request.id];
-        return (
-          <ClassificationCard
-            key={request.id}
-            request={request}
-            result={result}
-            reviewed={Boolean(verdict)}
-            reviewSlot={
-              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
-                {VERDICT_LABELS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => onVerdict(request.id, option.value)}
-                    className={
-                      "rounded-md border px-3 py-1.5 text-xs font-medium " +
-                      (verdict === option.value
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 text-slate-700")
-                    }
-                  >
-                    {option.label}
-                  </button>
-                ))}
-                {verdict && <span className="text-xs text-slate-400">Reviewed</span>}
-              </div>
-            }
-          />
-        );
-      })}
-    </div>
+    <span
+      className={
+        "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium " +
+        LABEL_BADGE_CLASSES[label]
+      }
+    >
+      {LABEL_TEXT[label]}
+    </span>
   );
 }
 
 export function SummaryStep({
   requests,
   results,
-  verdicts,
+  onFileFollowUp,
 }: {
   requests: InformationRequest[];
   results: Record<string, ClassificationResult>;
-  verdicts: Record<string, ReviewVerdict>;
+  onFileFollowUp: (followUp: FollowUpContext) => void;
 }) {
   const counts: Partial<Record<ClassificationResult["label"], number>> = {};
   for (const request of requests) {
@@ -281,9 +220,44 @@ export function SummaryStep({
   }
   const total = requests.length;
 
-  const unreviewedInsufficient = requests.filter(
-    (r) => results[r.id]?.label === "INSUFFICIENT_EVIDENCE" && !verdicts[r.id],
-  ).length;
+  const unanswered = requests.filter((r) => {
+    const label = results[r.id]?.label;
+    return label !== undefined && FOLLOW_UP_LABELS.includes(label);
+  });
+  const others = requests.filter((r) => results[r.id] && !unanswered.includes(r));
+
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(unanswered.map((r) => r.id)),
+  );
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleFileFollowUp() {
+    const followUpRequests: InformationRequest[] = unanswered
+      .filter((r) => selected.has(r.id))
+      .map((r) => {
+        const result = results[r.id];
+        return {
+          ...r,
+          id: `FU-${r.id}`,
+          source: "follow-up",
+          context: `Earlier reply (${LABEL_TEXT[result.label].toLowerCase()}): ${result.explanation}`,
+          publiclyAvailable: undefined,
+          publicSource: undefined,
+        };
+      });
+    onFileFollowUp({
+      originalAuthority: requests[0]?.authority ?? "",
+      requests: followUpRequests,
+    });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -302,23 +276,84 @@ export function SummaryStep({
         ))}
       </div>
 
-      {unreviewedInsufficient > 0 && (
-        <div className="rounded-md border border-slate-200 bg-gray-50 p-4">
-          <p className="text-sm text-slate-700">
-            {unreviewedInsufficient} request{unreviewedInsufficient === 1 ? "" : "s"} marked
-            "Insufficient evidence" still need{unreviewedInsufficient === 1 ? "s" : ""} human
-            review.
+      {unanswered.length > 0 ? (
+        <div className="flex flex-col gap-3 rounded-md border border-orange-200 bg-orange-50/40 p-4">
+          <div>
+            <p className="text-sm font-medium text-slate-900">
+              {unanswered.length} of {total} request{total === 1 ? " was" : "s were"} not fully
+              answered
+            </p>
+            <p className="mt-0.5 text-[13px] text-slate-600">
+              Select the ones you still want, and we'll start a follow-up RTI with them and the
+              context from this reply.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {unanswered.map((request) => {
+              const result = results[request.id];
+              return (
+                <label
+                  key={request.id}
+                  className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 bg-white p-3"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(request.id)}
+                    onChange={() => toggle(request.id)}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="flex flex-wrap items-start justify-between gap-2">
+                      <span className="text-sm font-medium text-slate-900">{request.title}</span>
+                      <LabelBadge label={result.label} />
+                    </span>
+                    <span className="text-xs text-slate-600">{result.explanation}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              If the reply was incomplete, you can also file a First Appeal (Section 19(1)) within
+              30 days of receiving it.
+            </p>
+            <PrimaryButton onClick={handleFileFollowUp} disabled={selected.size === 0}>
+              <FilePlus2 size={14} />
+              File follow-up RTI ({selected.size})
+            </PrimaryButton>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-md border border-green-200 bg-green-50 p-4">
+          <p className="text-sm text-green-800">
+            Every request was answered or has a clear next step — no follow-up RTI needed.
           </p>
         </div>
       )}
 
-      <div className="rounded-md border border-slate-200 p-4">
-        <p className="text-sm text-slate-700">
-          Analysis complete for {total} request{total === 1 ? "" : "s"}. Every finding above is
-          grounded in the quoted response passages and can still be revisited from the review
-          step.
-        </p>
-      </div>
+      {others.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium text-slate-900">Other requests</p>
+          {others.map((request) => {
+            const result = results[request.id];
+            return (
+              <div
+                key={request.id}
+                className="flex flex-col gap-1 rounded-md border border-slate-200 p-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <span className="text-sm text-slate-900">{request.title}</span>
+                  <LabelBadge label={result.label} />
+                </div>
+                {NEXT_STEP_HINT[result.label] && (
+                  <span className="text-xs text-slate-500">{NEXT_STEP_HINT[result.label]}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

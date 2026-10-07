@@ -5,7 +5,6 @@ const STEP_LABELS: { id: StepId; label: string }[] = [
   { id: "upload", label: "Upload" },
   { id: "align", label: "Alignment" },
   { id: "classify", label: "Classification" },
-  { id: "review", label: "Review" },
   { id: "summary", label: "Summary" },
 ];
 

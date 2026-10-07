@@ -1,11 +1,15 @@
 import { useState } from "react";
-import type { ClassificationResult, ResponsePassage, ReviewVerdict } from "../../types";
+import type { ClassificationResult, FollowUpContext, ResponsePassage } from "../../types";
 import { getCaseStatus, MOCK_ORIGINAL_REQUESTS, type StepId } from "./constants";
 import { alignRequests, classifyResponse, ingestResponse } from "./mocks";
-import { AlignStep, ClassifyStep, ReviewStep, SummaryStep, UploadStep } from "./steps";
+import { AlignStep, ClassifyStep, SummaryStep, UploadStep } from "./steps";
 import { PrimaryButton, SecondaryButton, StepProgressBar } from "./ui";
 
-export default function ResponseAnalysisWizard() {
+export default function ResponseAnalysisWizard({
+  onFileFollowUp,
+}: {
+  onFileFollowUp: (followUp: FollowUpContext) => void;
+}) {
   const [step, setStep] = useState<StepId>("upload");
 
   const [file, setFile] = useState<File | null>(null);
@@ -22,7 +26,6 @@ export default function ResponseAnalysisWizard() {
   const [classifications, setClassifications] = useState<Record<string, ClassificationResult>>(
     {},
   );
-  const [verdicts, setVerdicts] = useState<Record<string, ReviewVerdict>>({});
 
   const requests = MOCK_ORIGINAL_REQUESTS;
 
@@ -67,15 +70,10 @@ export default function ResponseAnalysisWizard() {
     });
   }
 
-  function handleVerdict(requestId: string, verdict: ReviewVerdict) {
-    setVerdicts((prev) => ({ ...prev, [requestId]: verdict }));
-  }
-
   function goBack() {
     if (step === "align") setStep("upload");
     else if (step === "classify") setStep("align");
-    else if (step === "review") setStep("classify");
-    else if (step === "summary") setStep("review");
+    else if (step === "summary") setStep("classify");
   }
 
   return (
@@ -108,17 +106,12 @@ export default function ResponseAnalysisWizard() {
 
           {step === "classify" && <ClassifyStep requests={requests} results={classifications} />}
 
-          {step === "review" && (
-            <ReviewStep
+          {step === "summary" && (
+            <SummaryStep
               requests={requests}
               results={classifications}
-              verdicts={verdicts}
-              onVerdict={handleVerdict}
+              onFileFollowUp={onFileFollowUp}
             />
-          )}
-
-          {step === "summary" && (
-            <SummaryStep requests={requests} results={classifications} verdicts={verdicts} />
           )}
         </div>
 
@@ -134,9 +127,6 @@ export default function ResponseAnalysisWizard() {
           )}
           {step === "align" && <PrimaryButton onClick={handleAlignContinue}>Continue</PrimaryButton>}
           {step === "classify" && (
-            <PrimaryButton onClick={() => setStep("review")}>Continue</PrimaryButton>
-          )}
-          {step === "review" && (
             <PrimaryButton onClick={() => setStep("summary")}>Continue</PrimaryButton>
           )}
           {step === "summary" && <PrimaryButton disabled>Done</PrimaryButton>}

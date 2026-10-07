@@ -5,7 +5,22 @@ export interface InformationRequest {
   authority: string;
   period: string;
   quality: "good" | "needs-detail";
+  source?: "generated" | "custom" | "follow-up";
+  context?: string; // why this is being asked, e.g. what an earlier reply left out
   publiclyAvailable?: boolean;
+  publicSource?: PublicSource; // where the information was found, when publiclyAvailable
+}
+
+export interface PublicSource {
+  title: string;
+  url: string;
+}
+
+// Hand-off from the Response Analysis Wizard to the RTI Drafting Wizard when
+// the authority did not fully answer the original application.
+export interface FollowUpContext {
+  originalAuthority: string;
+  requests: InformationRequest[];
 }
 
 export interface ResponsePassage {
@@ -33,5 +48,3 @@ export interface ClassificationResult {
   evidence: ResponsePassage[];
   abstentionReason?: string; // required when label === "INSUFFICIENT_EVIDENCE"
 }
-
-export type ReviewVerdict = "agree" | "disagree" | "evidence-incorrect";

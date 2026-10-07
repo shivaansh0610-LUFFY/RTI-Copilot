@@ -1,6 +1,6 @@
 import type { ClassificationLabel, InformationRequest } from "../../types";
 
-export type StepId = "upload" | "align" | "classify" | "review" | "summary";
+export type StepId = "upload" | "align" | "classify" | "summary";
 
 export function getCaseStatus(
   step: StepId,
@@ -13,7 +13,6 @@ export function getCaseStatus(
     return "RESPONSE_UPLOADED";
   }
   if (step === "align" || step === "classify") return "ANALYSIS_READY";
-  if (step === "review") return "HUMAN_REVIEW";
   return "COMPLETED";
 }
 
@@ -80,6 +79,24 @@ export const LABEL_TEXT: Record<ClassificationLabel, string> = {
   FEE_DEMANDED: "Fee demanded",
   ATTACHMENT_REFERENCED: "Attachment referenced",
   INSUFFICIENT_EVIDENCE: "Insufficient evidence",
+};
+
+// Outcomes where the information was not actually provided, so the citizen is
+// offered a follow-up RTI for them (pre-selected on the summary step).
+export const FOLLOW_UP_LABELS: ClassificationLabel[] = [
+  "PARTIALLY_RESPONSIVE",
+  "NON_RESPONSIVE",
+  "NO_RECORD_STATED",
+  "INSUFFICIENT_EVIDENCE",
+];
+
+// What the citizen should do for outcomes that don't call for a fresh request.
+export const NEXT_STEP_HINT: Partial<Record<ClassificationLabel, string>> = {
+  RESPONSIVE: "Answered — no action needed.",
+  ATTACHMENT_REFERENCED: "Check the referenced attachment was enclosed with the reply.",
+  FEE_DEMANDED: "Pay the additional fee to receive the information.",
+  EXEMPTION_CLAIMED: "Consider a First Appeal if the exemption seems unjustified.",
+  TRANSFERRED: "Wait for a reply from the authority it was transferred to.",
 };
 
 export const LABEL_BADGE_CLASSES: Record<ClassificationLabel, string> = {

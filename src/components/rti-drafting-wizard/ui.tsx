@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 import type { InformationRequest } from "../../types";
 import type { StepId } from "./constants";
 
@@ -97,24 +97,65 @@ export function SecondaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElem
   );
 }
 
+export function SourceBadge({ source }: { source: InformationRequest["source"] }) {
+  if (source === "custom") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+        Added by you
+      </span>
+    );
+  }
+  if (source === "follow-up") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
+        Follow-up
+      </span>
+    );
+  }
+  return null;
+}
+
 export function RequestCard({
   request,
   rightSlot,
+  onRemove,
+  children,
 }: {
   request: InformationRequest;
   rightSlot?: React.ReactNode;
+  onRemove?: () => void;
+  children?: React.ReactNode;
 }) {
   return (
     <div className="rounded-md border border-slate-200 p-4">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <CategoryBadge>{request.category}</CategoryBadge>
-        <QualityBadge quality={request.quality} />
-        {rightSlot}
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <CategoryBadge>{request.category}</CategoryBadge>
+          <QualityBadge quality={request.quality} />
+          <SourceBadge source={request.source} />
+          {rightSlot}
+        </div>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove "${request.title}"`}
+            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
       <p className="text-sm font-medium text-slate-900">{request.title}</p>
       <p className="mt-1 text-xs text-slate-500">
         {request.authority} &middot; {request.period}
       </p>
+      {request.context && (
+        <p className="mt-2 border-l-2 border-orange-200 pl-2 text-xs text-slate-600">
+          {request.context}
+        </p>
+      )}
+      {children}
     </div>
   );
 }

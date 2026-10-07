@@ -1,8 +1,8 @@
-import { Loader2 } from "lucide-react";
+import { CornerDownRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { InformationRequest } from "../../types";
+import type { FollowUpContext, InformationRequest } from "../../types";
 import { ALL_STEPS, CASE_STATUS, type StepId } from "./constants";
-import { checkPublicInfo, decomposeGrievance, generateDraft } from "./mocks";
+import { checkPublicInfo, createCustomRequest, decomposeGrievance, generateDraft } from "./mocks";
 import {
   ClarifyStep,
   DescribeStep,
@@ -13,16 +13,25 @@ import {
 } from "./steps";
 import { PrimaryButton, SecondaryButton, StepProgressBar } from "./ui";
 
-export default function RtiDraftingWizard() {
-  const [step, setStep] = useState<StepId>("describe");
+// A follow-up starts at the Requests step: the grievance and clarification are
+// already known from the original application.
+export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpContext }) {
+  const [step, setStep] = useState<StepId>(followUp ? "requests" : "describe");
 
-  const [grievance, setGrievance] = useState("");
+  const [grievance, setGrievance] = useState(
+    followUp
+      ? `Follow-up to an earlier RTI application to ${followUp.originalAuthority}. The reply did not fully answer ${followUp.requests.length} of the requests.`
+      : "",
+  );
   const [grievanceError, setGrievanceError] = useState("");
 
-  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
+  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>(
+    followUp ? { period: followUp.requests[0]?.period ?? "Last 1 year", knowsAuthority: "yes" } : {},
+  );
   const [clarifyError, setClarifyError] = useState("");
 
-  const [requests, setRequests] = useState<InformationRequest[]>([]);
+  const [requests, setRequests] = useState<InformationRequest[]>(followUp?.requests ?? []);
+  const [requestsError, setRequestsError] = useState("");
   const [carriedRequests, setCarriedRequests] = useState<InformationRequest[]>([]);
   const [draftText, setDraftText] = useState("");
 
@@ -58,13 +67,36 @@ export default function RtiDraftingWizard() {
     setClarifyError("");
     setIsLoading(true);
     decomposeGrievance(grievance, clarificationAnswers).then((result) => {
-      setRequests(result);
+      // Re-decomposing replaces only system-generated requests; the citizen's
+      // own and follow-up requests are kept.
+      setRequests((prev) => [...result, ...prev.filter((r) => r.source !== "generated")]);
       setIsLoading(false);
       setStep("requests");
     });
   }
 
+  function handleAddRequest(title: string, category: string) {
+    return createCustomRequest(
+      title,
+      category,
+      requests[0]?.authority ?? followUp?.originalAuthority,
+      clarificationAnswers.period ?? "Last 1 year",
+    ).then((request) => {
+      setRequests((prev) => [...prev, request]);
+      setRequestsError("");
+    });
+  }
+
+  function handleRemoveRequest(id: string) {
+    setRequests((prev) => prev.filter((r) => r.id !== id));
+  }
+
   function handleRequestsContinue() {
+    if (requests.length === 0) {
+      setRequestsError("Add at least one request to continue.");
+      return;
+    }
+    setRequestsError("");
     setIsLoading(true);
     checkPublicInfo(requests).then((result) => {
       setRequests(result);
@@ -121,6 +153,17 @@ export default function RtiDraftingWizard() {
 
       <StepProgressBar steps={visibleSteps} currentStepId={step} />
 
+      {followUp && (
+        <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 p-3">
+          <CornerDownRight size={16} className="mt-0.5 shrink-0 text-orange-700" />
+          <p className="text-[13px] text-orange-800">
+            Follow-up RTI to {followUp.originalAuthority}. {followUp.requests.length} unanswered
+            request{followUp.requests.length === 1 ? " was" : "s were"} carried over from the
+            response analysis.
+          </p>
+        </div>
+      )}
+
       <div className="flex min-h-[360px] flex-col rounded-md border border-slate-200">
         <div className="flex-1 p-6">
           {step === "describe" && (
@@ -137,7 +180,15 @@ export default function RtiDraftingWizard() {
             />
           )}
 
-          {step === "requests" && <RequestsStep requests={requests} />}
+          {step === "requests" && (
+            <RequestsStep
+              requests={requests}
+              isFollowUp={Boolean(followUp)}
+              onAdd={handleAddRequest}
+              onRemove={handleRemoveRequest}
+              error={requestsError}
+            />
+          )}
 
           {step === "public-check" && <PublicCheckStep requests={requests} />}
 
