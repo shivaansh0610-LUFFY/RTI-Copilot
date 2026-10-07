@@ -66,13 +66,17 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
     }
     setClarifyError("");
     setIsLoading(true);
-    decomposeGrievance(grievance, clarificationAnswers).then((result) => {
-      // Re-decomposing replaces only system-generated requests; the citizen's
-      // own and follow-up requests are kept.
-      setRequests((prev) => [...result, ...prev.filter((r) => r.source !== "generated")]);
-      setIsLoading(false);
-      setStep("requests");
-    });
+    decomposeGrievance(grievance, clarificationAnswers)
+      .then((result) => {
+        // Re-decomposing replaces only system-generated requests; the citizen's
+        // own and follow-up requests are kept.
+        setRequests((prev) => [...result, ...prev.filter((r) => r.source !== "generated")]);
+        setStep("requests");
+      })
+      .catch(() => {
+        setClarifyError("We couldn't reach the server. Please try again.");
+      })
+      .finally(() => setIsLoading(false));
   }
 
   function handleAddRequest(title: string, category: string) {
