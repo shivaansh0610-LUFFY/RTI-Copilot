@@ -39,7 +39,10 @@ def test_engine_requires_database_url() -> None:
 
 
 def test_engine_is_built_lazily_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(db, "get_settings", lambda: Settings(_env_file=None, database_url="sqlite://"))
+    configured_url = "sqlite:///configured_url_probe.db"
+    monkeypatch.setattr(db, "get_settings", lambda: Settings(_env_file=None, database_url=configured_url))
+    db.get_engine.cache_clear()
     engine = db.get_engine()
     assert isinstance(engine, Engine)
+    assert str(engine.url) == configured_url
     assert db.get_engine() is engine
