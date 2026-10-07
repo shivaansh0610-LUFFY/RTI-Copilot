@@ -14,7 +14,10 @@ class Base(DeclarativeBase):
 @lru_cache
 def get_engine() -> Engine:
     # Created on first use so the app can start (and tests can run) without a database.
-    return create_engine(get_settings().database_url, pool_pre_ping=True)
+    database_url = get_settings().database_url
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is not set. Copy .env.example to .env and fill it in.")
+    return create_engine(database_url, pool_pre_ping=True)
 
 
 def get_db() -> Iterator[Session]:
