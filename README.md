@@ -67,8 +67,10 @@ progress. This README will be updated as further milestones are completed.
 
 ## Running locally
 
-Copy `.env.example` to `.env` first and set `POSTGRES_PASSWORD` (and the
-matching `DATABASE_URL`) to a password of your own. Never commit `.env`.
+Copy `.env.example` to `.env` first and set `POSTGRES_PASSWORD` to a password
+of your own, using URL-safe characters (e.g. `openssl rand -hex 24`). When
+running the API outside Docker, put the same password in `DATABASE_URL`.
+Never commit `.env`.
 
 **Frontend** (React + Vite):
 
