@@ -1,8 +1,9 @@
 from fastapi import APIRouter
 
+from app.config import get_settings
 from app.routers.cases import CaseDep
 from app.schemas import DecomposeBody, DraftResponse, InformationRequest, RequestsBody
-from app.services.drafting import mock
+from app.services.drafting import mock, real
 
 router = APIRouter(prefix="/cases/{case_id}", tags=["drafting"])
 
@@ -15,7 +16,8 @@ router = APIRouter(prefix="/cases/{case_id}", tags=["drafting"])
 def decompose(case: CaseDep, body: DecomposeBody) -> list[InformationRequest]:
     case.clarification = body.clarification
     case.status = "REQUESTS_GENERATED"
-    return mock.decompose_grievance(case.grievance_text, body.clarification)
+    decompose_grievance = real.decompose_grievance if get_settings().use_llm_drafting else mock.decompose_grievance
+    return decompose_grievance(case.grievance_text, body.clarification)
 
 
 @router.post(

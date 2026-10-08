@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     database_url: str = ""
     llm_api_key: str = ""
     llm_model: str = ""
+    # Off by default so tests and local runs without an API key stay offline and
+    # deterministic; the mock drafting logic is used until this is explicitly enabled.
+    use_llm_drafting: bool = False
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
