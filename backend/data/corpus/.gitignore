@@ -1,0 +1,5 @@
+# Downloaded source documents can be very large and are not committed.
+# data/sources.csv records each one's URL and SHA-256; `python -m ingest.register_sources`
+# re-downloads and verifies them.
+*
+!.gitignore
