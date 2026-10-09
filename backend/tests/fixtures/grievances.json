@@ -1,0 +1,22 @@
+[
+  {
+    "id": "pothole",
+    "grievance_text": "There is a large pothole on the road outside my house that has not been repaired for over 8 months despite several complaints to the ward office.",
+    "clarification": { "period": "Last 1 year", "knowsAuthority": "no" }
+  },
+  {
+    "id": "waterlogging-after-road-work",
+    "grievance_text": "Ever since PWD relaid the road in our colony six months ago, the road floods every time it rains because the new surface has no proper drainage slope.",
+    "clarification": { "period": "Last 6 months", "knowsAuthority": "yes" }
+  },
+  {
+    "id": "unfinished-road",
+    "grievance_text": "A road widening project near our market started over a year ago and was never completed; it has been left half-dug and unusable ever since.",
+    "clarification": { "period": "More than 2 years", "knowsAuthority": "no" }
+  },
+  {
+    "id": "damaged-footpath",
+    "grievance_text": "The footpath along the main road has broken tiles and exposed rebar in several places, and an elderly neighbour tripped and was injured there last month.",
+    "clarification": { "period": "Last 2 years", "knowsAuthority": "yes" }
+  }
+]

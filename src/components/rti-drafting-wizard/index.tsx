@@ -1,6 +1,6 @@
 import { CornerDownRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { FollowUpContext, InformationRequest } from "../../types";
+import type { DraftResult, FollowUpContext, InformationRequest } from "../../types";
 import { ALL_STEPS, CASE_STATUS, type StepId } from "./constants";
 import { checkPublicInfo, createCustomRequest, decomposeGrievance, generateDraft } from "./mocks";
 import {
@@ -33,7 +33,8 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
   const [requests, setRequests] = useState<InformationRequest[]>(followUp?.requests ?? []);
   const [requestsError, setRequestsError] = useState("");
   const [carriedRequests, setCarriedRequests] = useState<InformationRequest[]>([]);
-  const [draftText, setDraftText] = useState("");
+  const [draft, setDraft] = useState<DraftResult | undefined>();
+  const [caseId, setCaseId] = useState<string | undefined>();
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -67,10 +68,11 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
     setClarifyError("");
     setIsLoading(true);
     decomposeGrievance(grievance, clarificationAnswers)
-      .then((result) => {
+      .then(({ requests: result, caseId: newCaseId }) => {
         // Re-decomposing replaces only system-generated requests; the citizen's
         // own and follow-up requests are kept.
         setRequests((prev) => [...result, ...prev.filter((r) => r.source !== "generated")]);
+        if (newCaseId) setCaseId(newCaseId);
         setStep("requests");
       })
       .catch(() => {
@@ -102,7 +104,7 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
     }
     setRequestsError("");
     setIsLoading(true);
-    checkPublicInfo(requests).then((result) => {
+    checkPublicInfo(requests, caseId).then((result) => {
       setRequests(result);
       setIsLoading(false);
       setStep("public-check");
@@ -117,8 +119,8 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
       setStep("quality-review");
     } else {
       setIsLoading(true);
-      generateDraft(nonPublic).then((text) => {
-        setDraftText(text);
+      generateDraft(nonPublic, caseId).then((result) => {
+        setDraft(result);
         setIsLoading(false);
         setStep("draft");
       });
@@ -127,8 +129,8 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
 
   function handleQualityReviewContinue() {
     setIsLoading(true);
-    generateDraft(carriedRequests).then((text) => {
-      setDraftText(text);
+    generateDraft(carriedRequests, caseId).then((result) => {
+      setDraft(result);
       setIsLoading(false);
       setStep("draft");
     });
@@ -203,7 +205,7 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
             />
           )}
 
-          {step === "draft" && <DraftStep draftText={draftText} />}
+          {step === "draft" && draft && <DraftStep draft={draft} requests={carriedRequests} />}
         </div>
 
         <div className="flex items-center justify-between border-t border-slate-200 p-4">

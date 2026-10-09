@@ -12,3 +12,7 @@ class RequestsBody(ApiModel):
 
 class DraftResponse(ApiModel):
     draft_text: str
+    char_count: int
+    over_limit: bool
+    warning: str | None = None
+    flagged_request_ids: list[str] = []
