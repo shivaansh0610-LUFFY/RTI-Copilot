@@ -48,8 +48,64 @@ def test_draft_returns_text_covering_each_request(client, case_id):
     requests[0]["context"] = "Earlier reply left this out."
     response = client.post(f"/cases/{case_id}/draft", json={"requests": requests})
     assert response.status_code == 200
-    assert set(response.json()) == {"draftText"}
-    draft_text = response.json()["draftText"]
+    body = response.json()
+    assert set(body) == {"draftText", "charCount", "overLimit", "flaggedRequestIds"}
+    draft_text = body["draftText"]
     for request in requests:
         assert request["title"] in draft_text
     assert "Background: Earlier reply left this out." in draft_text
+    assert body["charCount"] == len(draft_text)
+    assert body["overLimit"] is False
+    assert body["flaggedRequestIds"] == []
+
+
+def test_draft_flags_vague_titles(client, case_id):
+    response = client.post(
+        f"/cases/{case_id}/draft",
+        json={
+            "requests": [
+                {
+                    "id": "RQ-001",
+                    "category": "Work order",
+                    "title": "repair details",  # 2 words: too vague
+                    "authority": "PWD",
+                    "period": "Last 1 year",
+                    "quality": "good",
+                },
+                {
+                    "id": "RQ-002",
+                    "category": "Work order",
+                    "title": "Copy of the work order sanctioning repair of the road",
+                    "authority": "PWD",
+                    "period": "Last 1 year",
+                    "quality": "good",
+                },
+            ]
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["flaggedRequestIds"] == ["RQ-001"]
+
+
+def test_draft_warns_when_over_the_portal_character_limit(client, case_id):
+    long_title = "Copy of the work order sanctioning repair, " * 100  # well over 3,000 chars total
+    response = client.post(
+        f"/cases/{case_id}/draft",
+        json={
+            "requests": [
+                {
+                    "id": "RQ-001",
+                    "category": "Work order",
+                    "title": long_title,
+                    "authority": "PWD",
+                    "period": "Last 1 year",
+                    "quality": "good",
+                }
+            ]
+        },
+    )
+    body = response.json()
+    assert body["overLimit"] is True
+    assert "3,000" in body["warning"]
+    # Warned, not truncated.
+    assert long_title.strip() in body["draftText"]
