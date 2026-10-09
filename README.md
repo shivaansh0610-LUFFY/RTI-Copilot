@@ -95,6 +95,27 @@ pytest
 
 Or run the API together with PostgreSQL + pgvector: `docker compose up`.
 
+**Source corpus** (the official documents the copilot searches, also in
+`backend/`, with the database running and `DATABASE_URL` set):
+
+```
+alembic upgrade head                       # create the tables
+python -m ingest.register_sources --db     # download data/sources.csv, verify checksums, fill `sources`
+python -m ingest.load_documents            # extract, split, embed and store the passages
+```
+
+`load_documents` is safe to rerun (sources that already have a document are
+skipped; `--force` re-ingests them). The first run downloads the embedding
+model, BAAI/bge-large-en-v1.5 (about 1.3 GB, cached afterwards), and embedding
+the ~4,800 passages is slow on a laptop (about 27 minutes on an Apple-silicon
+Mac); a rerun that has nothing to do takes under a second. Search them with
+`app.services.retrieval.search_passages(query, k)`.
+
+The tests never load that model. A few of them (`test_load_documents.py`,
+`test_retrieval.py`) also run against a real database when `TEST_DATABASE_URL`
+points at a PostgreSQL 16 + pgvector server; they work in a scratch schema and
+drop it afterwards. Without it they run on SQLite or skip.
+
 ## References
 
 - [Right to Information portal](https://rti.gov.in/)
