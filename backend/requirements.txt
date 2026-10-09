@@ -7,3 +7,6 @@ alembic>=1.14
 psycopg[binary]>=3.2
 pgvector>=0.3
 groq>=0.15
+pypdf>=6.0
+beautifulsoup4>=4.12
+sentence-transformers>=6.0
