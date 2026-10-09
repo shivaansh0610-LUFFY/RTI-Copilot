@@ -16,6 +16,14 @@ export interface PublicSource {
   url: string;
 }
 
+export interface DraftResult {
+  draftText: string;
+  charCount: number;
+  overLimit: boolean;
+  warning?: string;
+  flaggedRequestIds: string[];
+}
+
 // Hand-off from the Response Analysis Wizard to the RTI Drafting Wizard when
 // the authority did not fully answer the original application.
 export interface FollowUpContext {

@@ -1,4 +1,4 @@
-import type { InformationRequest } from "../../types";
+import type { DraftResult, InformationRequest } from "../../types";
 
 // Backend calls — each is a single async function. The ones still mocked are a
 // one-line swap for a real API call later: replace the body, keep the signature.
@@ -20,20 +20,24 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
-// POST /cases, then POST /cases/:id/decompose
+// POST /cases, then POST /cases/:id/decompose. The returned caseId threads through
+// checkPublicInfo and generateDraft below, since their real endpoints are case-scoped too.
 export async function decomposeGrievance(
   grievance: string,
   clarification: Record<string, string>,
-): Promise<InformationRequest[]> {
+): Promise<{ requests: InformationRequest[]; caseId?: string }> {
   if (API_URL) {
     const { caseId } = await postJson<{ caseId: string }>("/cases", {
       grievanceText: grievance,
     });
-    return postJson<InformationRequest[]>(`/cases/${caseId}/decompose`, { clarification });
+    const requests = await postJson<InformationRequest[]>(`/cases/${caseId}/decompose`, {
+      clarification,
+    });
+    return { requests, caseId };
   }
 
   const period = clarification.period ?? "Last 1 year";
-  return [
+  const requests: InformationRequest[] = [
     {
       id: "RQ-001",
       category: "Work order",
@@ -62,6 +66,7 @@ export async function decomposeGrievance(
       source: "generated",
     },
   ];
+  return { requests };
 }
 
 // Replace with: POST /cases/:id/requests
@@ -83,10 +88,15 @@ export async function createCustomRequest(
   };
 }
 
-// Replace with: POST /cases/:id/public-info-check
+// POST /cases/:id/public-info-check
 export async function checkPublicInfo(
   requests: InformationRequest[],
+  caseId?: string,
 ): Promise<InformationRequest[]> {
+  if (API_URL && caseId) {
+    return postJson<InformationRequest[]>(`/cases/${caseId}/public-info-check`, { requests });
+  }
+
   return requests.map((request) =>
     request.id === "RQ-001"
       ? {
@@ -101,9 +111,16 @@ export async function checkPublicInfo(
   );
 }
 
-// Replace with: POST /cases/:id/draft
-export async function generateDraft(requests: InformationRequest[]): Promise<string> {
-  return requests
+// POST /cases/:id/draft
+export async function generateDraft(
+  requests: InformationRequest[],
+  caseId?: string,
+): Promise<DraftResult> {
+  if (API_URL && caseId) {
+    return postJson<DraftResult>(`/cases/${caseId}/draft`, { requests });
+  }
+
+  const draftText = requests
     .map(
       (request) => `Subject: Request for information regarding "${request.title}"
 Authority: ${request.authority}
@@ -112,4 +129,13 @@ Period: ${request.period}
 ${request.context ? `Background: ${request.context}\n` : ""}`,
     )
     .join("\n---\n\n");
+  const flaggedRequestIds = requests
+    .filter((request) => request.title.trim().split(/\s+/).length < 6)
+    .map((request) => request.id);
+  return {
+    draftText,
+    charCount: draftText.length,
+    overLimit: draftText.length > 3000,
+    flaggedRequestIds,
+  };
 }

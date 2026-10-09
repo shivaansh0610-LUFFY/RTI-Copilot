@@ -1,6 +1,6 @@
-import { ExternalLink, FileText, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, ExternalLink, FileText, Loader2, Plus } from "lucide-react";
 import { useState } from "react";
-import type { InformationRequest } from "../../types";
+import type { DraftResult, InformationRequest } from "../../types";
 import { AUTHORITY_OPTIONS, PERIOD_OPTIONS } from "./constants";
 import {
   CategoryBadge,
@@ -293,13 +293,46 @@ export function QualityReviewStep({
   );
 }
 
-export function DraftStep({ draftText }: { draftText: string }) {
+export function DraftStep({
+  draft,
+  requests,
+}: {
+  draft: DraftResult;
+  requests: InformationRequest[];
+}) {
+  const flaggedTitles = requests.filter((request) => draft.flaggedRequestIds.includes(request.id));
+
   return (
     <div className="flex flex-col gap-3">
+      {draft.overLimit && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" />
+          <p className="text-[13px] text-amber-800">{draft.warning}</p>
+        </div>
+      )}
+
+      {flaggedTitles.length > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" />
+          <div className="text-[13px] text-amber-800">
+            <p className="font-medium">These requests may still be too vague for a PIO to act on:</p>
+            <ul className="mt-1 list-inside list-disc">
+              {flaggedTitles.map((request) => (
+                <li key={request.id}>{request.title}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
         <FileText size={18} className="text-slate-500" />
-        <pre className="whitespace-pre-wrap font-mono text-xs text-slate-800">{draftText}</pre>
+        <pre className="whitespace-pre-wrap font-mono text-xs text-slate-800">{draft.draftText}</pre>
       </div>
+      <p className="text-right text-xs text-slate-400">
+        {draft.charCount.toLocaleString()} / 3,000 characters
+      </p>
+
       <p className="text-[13px] text-slate-500">
         You file this application yourself on the official RTI portal (rtionline.gov.in or your
         state portal). RTI Copilot never submits applications or stores your portal credentials.
