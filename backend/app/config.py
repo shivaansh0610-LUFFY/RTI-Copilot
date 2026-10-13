@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Off by default so tests and local runs without an API key stay offline and
     # deterministic; the mock drafting logic is used until this is explicitly enabled.
     use_llm_drafting: bool = False
+    # Off by default: needs a real database with the corpus loaded (see README). Until set,
+    # public-info-check uses the deterministic mock.
+    use_public_info_lookup: bool = False
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 

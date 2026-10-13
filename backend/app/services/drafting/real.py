@@ -6,7 +6,7 @@ breaks the endpoint for the citizen filing a request.
 import logging
 
 from app.schemas import InformationRequest
-from app.services import llm
+from app.services import llm, public_info
 from app.services.drafting import mock
 from app.services.drafting.mock import DEFAULT_AUTHORITY
 
@@ -57,3 +57,11 @@ def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[I
     except Exception:
         logger.warning("LLM decomposition failed, falling back to mock", exc_info=True)
         return mock.decompose_grievance(grievance, clarification)
+
+
+def check_public_info(requests: list[InformationRequest]) -> list[InformationRequest]:
+    try:
+        return public_info.check_public_info(requests)
+    except Exception:
+        logger.warning("Public-info lookup failed, falling back to mock", exc_info=True)
+        return mock.check_public_info(requests)

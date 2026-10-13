@@ -1,3 +1,4 @@
+from app.schemas import InformationRequest
 from app.services.drafting import real
 
 
@@ -39,3 +40,31 @@ def test_decompose_grievance_falls_back_on_empty_array(monkeypatch):
     requests = real.decompose_grievance("The road is broken", {})
 
     assert requests == real.mock.decompose_grievance("The road is broken", {})
+
+
+SAMPLE_REQUEST = InformationRequest(
+    id="RQ-001",
+    category="Work order",
+    title="Copy of the work order sanctioning repair of the road",
+    authority="PWD",
+    period="Last 1 year",
+    quality="good",
+)
+
+
+def test_check_public_info_uses_the_real_lookup(monkeypatch):
+    monkeypatch.setattr(real.public_info, "check_public_info", lambda requests: ["looked up"])
+
+    assert real.check_public_info([SAMPLE_REQUEST]) == ["looked up"]
+
+
+def test_check_public_info_falls_back_to_mock_on_failure(monkeypatch):
+    def raise_no_database(*args, **kwargs):
+        raise RuntimeError("DATABASE_URL is not set")
+
+    monkeypatch.setattr(real.public_info, "check_public_info", raise_no_database)
+
+    requests = real.check_public_info([SAMPLE_REQUEST])
+
+    # Falls back to the deterministic mock rather than letting the endpoint 500.
+    assert requests == real.mock.check_public_info([SAMPLE_REQUEST])

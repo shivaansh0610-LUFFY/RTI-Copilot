@@ -31,7 +31,8 @@ def decompose(case: CaseDep, body: DecomposeBody) -> list[InformationRequest]:
     response_model_exclude_none=True,
 )
 def public_info_check(case: CaseDep, body: RequestsBody) -> list[InformationRequest]:
-    return mock.check_public_info(body.requests)
+    check_public_info = real.check_public_info if get_settings().use_public_info_lookup else mock.check_public_info
+    return check_public_info(body.requests)
 
 
 @router.post("/draft", response_model=DraftResponse, response_model_exclude_none=True)
