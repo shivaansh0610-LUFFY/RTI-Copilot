@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
+from app import case_store
 from app.config import get_settings
-from app.routers.cases import CaseDep
+from app.routers.cases import CaseDep, SessionDep
 from app.schemas import DecomposeBody, DraftResponse, InformationRequest, RequestsBody
 from app.services.drafting import mock, real
 from app.services.drafting.specificity import is_vague
@@ -18,11 +19,13 @@ router = APIRouter(prefix="/cases/{case_id}", tags=["drafting"])
     response_model=list[InformationRequest],
     response_model_exclude_none=True,
 )
-def decompose(case: CaseDep, body: DecomposeBody) -> list[InformationRequest]:
-    case.clarification = body.clarification
-    case.status = "REQUESTS_GENERATED"
+def decompose(case: CaseDep, session: SessionDep, body: DecomposeBody) -> list[InformationRequest]:
     decompose_grievance = real.decompose_grievance if get_settings().use_llm_drafting else mock.decompose_grievance
-    return decompose_grievance(case.grievance_text, body.clarification)
+    requests = decompose_grievance(case.grievance_text, body.clarification)
+    case_store.update_case(
+        case, session=session, clarification=body.clarification, status=case_store.REQUESTS_GENERATED
+    )
+    return requests
 
 
 @router.post(
@@ -36,9 +39,9 @@ def public_info_check(case: CaseDep, body: RequestsBody) -> list[InformationRequ
 
 
 @router.post("/draft", response_model=DraftResponse, response_model_exclude_none=True)
-def draft(case: CaseDep, body: RequestsBody) -> DraftResponse:
-    case.status = "DRAFT_READY"
+def draft(case: CaseDep, session: SessionDep, body: RequestsBody) -> DraftResponse:
     draft_text = mock.generate_draft(body.requests)
+    case_store.update_case(case, session=session, status=case_store.DRAFT_READY)
     char_count = len(draft_text)
     over_limit = char_count > PORTAL_CHAR_LIMIT
     warning = (
