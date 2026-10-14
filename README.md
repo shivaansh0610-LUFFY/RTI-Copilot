@@ -95,6 +95,12 @@ pytest
 
 Or run the API together with PostgreSQL + pgvector: `docker compose up`.
 
+Cases and their information requests are stored in PostgreSQL, so creating a
+case needs the database, `DATABASE_URL`, and the tables: run
+`alembic upgrade head` (from `backend/`, with `DATABASE_URL` set, as in the
+next section) once. `docker compose up` starts the database but does not create
+the tables. Cases survive a restart of the API.
+
 **Source corpus** (the official documents the copilot searches, also in
 `backend/`, with the database running and `DATABASE_URL` set):
 
@@ -112,9 +118,11 @@ Mac); a rerun that has nothing to do takes under a second. Search them with
 `app.services.retrieval.search_passages(query, k)`.
 
 The tests never load that model. A few of them (`test_load_documents.py`,
-`test_retrieval.py`) also run against a real database when `TEST_DATABASE_URL`
-points at a PostgreSQL 16 + pgvector server; they work in a scratch schema and
-drop it afterwards. Without it they run on SQLite or skip.
+`test_retrieval.py`, `test_case_store.py`, `test_case_requests.py`,
+`test_case_persistence.py`) also run against a real database when
+`TEST_DATABASE_URL` points at a PostgreSQL 16 + pgvector server; they work in a
+scratch schema and drop it afterwards. Without it they run on SQLite or skip;
+the router tests always run on SQLite and need no database.
 
 ## References
 

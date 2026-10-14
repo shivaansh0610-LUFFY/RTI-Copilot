@@ -1,10 +1,11 @@
-"""Helpers shared by the ingestion and retrieval tests (not a test module).
+"""Helpers shared by the ingestion, retrieval and case tests (not a test module).
 
 * fake embeddings, so no test ever loads the 1.3 GB model;
 * a minimal PDF writer, so the PDF path is exercised without committing a binary fixture;
 * database sessions: an in-memory SQLite stand-in that always works, and real PostgreSQL + pgvector
   when TEST_DATABASE_URL points at a server. The PostgreSQL tests run in a scratch schema that is
   dropped afterwards, so they never touch tables of the same name in the database they connect to.
+  The SQLite stand-in has every table in app.models, so it serves the case tests too.
 """
 
 import hashlib
@@ -19,10 +20,12 @@ from uuid import uuid4
 
 import pytest
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
+from sqlalchemy.schema import CreateColumn
 
 from app.db import Base
 from app.models import Document, Passage, Source
@@ -119,11 +122,21 @@ def _tsvector_as_text(type_, compiler, **kw):
     return "TEXT"
 
 
+@compiles(CreateColumn, "sqlite")
+def _drop_postgres_casts(element, compiler, **kw):
+    # `cases.clarification` defaults to '{}'::jsonb, a cast SQLite cannot parse.
+    return compiler.visit_create_column(element, **kw).replace("::jsonb", "")
+
+
 @contextmanager
-def sqlite_session() -> Iterator[Session]:
-    """The corpus tables on in-memory SQLite. `tsv` is just the text and `embedding` a string, so
-    this checks the Python logic and the ORM operations, not PostgreSQL's search."""
-    engine = create_engine("sqlite://")
+def sqlite_engine() -> Iterator[Engine]:
+    """Every table in app.models on in-memory SQLite. `tsv` is just the text and `embedding` a
+    string, so this checks the Python logic and the ORM operations, not PostgreSQL's search.
+
+    All connections share one SQLite connection, so the engine can also serve a TestClient, which
+    runs the app in other threads (a plain in-memory database is empty in every thread but one).
+    """
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
 
     @event.listens_for(engine, "connect")
     def _prepare(connection, _record):
@@ -131,15 +144,17 @@ def sqlite_session() -> Iterator[Session]:
         # `passages.tsv` is a generated column calling a PostgreSQL function.
         connection.create_function("to_tsvector", 2, lambda config, value: value, deterministic=True)
 
-    tables = [Source.__table__, Document.__table__, Passage.__table__]
-    Base.metadata.create_all(engine, tables=tables)
-    with engine.begin() as connection:
-        connection.execute(text("CREATE TABLE cases (id CHAR(32) PRIMARY KEY)"))  # target of documents.case_id
+    Base.metadata.create_all(engine)
     try:
-        with Session(engine) as session:
-            yield session
+        yield engine
     finally:
         engine.dispose()
+
+
+@contextmanager
+def sqlite_session() -> Iterator[Session]:
+    with sqlite_engine() as engine, Session(engine) as session:
+        yield session
 
 
 @contextmanager
