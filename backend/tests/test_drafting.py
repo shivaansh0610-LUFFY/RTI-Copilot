@@ -56,7 +56,9 @@ def test_draft_returns_text_covering_each_request(client, case_id):
     assert "Background: Earlier reply left this out." in draft_text
     assert body["charCount"] == len(draft_text)
     assert body["overLimit"] is False
-    assert body["flaggedRequestIds"] == []
+    # RQ-002's mock title, "Details of amount spent", is 4 words -- genuinely vague by our
+    # own 6-word threshold, consistent with its quality already being "needs-detail".
+    assert body["flaggedRequestIds"] == ["RQ-002"]
 
 
 def test_draft_flags_vague_titles(client, case_id):
