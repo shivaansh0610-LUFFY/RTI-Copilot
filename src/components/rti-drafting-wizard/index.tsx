@@ -1,8 +1,15 @@
 import { CornerDownRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { DraftResult, FollowUpContext, InformationRequest } from "../../types";
+import type { ClarifyQuestion, DraftResult, FollowUpContext, InformationRequest } from "../../types";
 import { ALL_STEPS, CASE_STATUS, type StepId } from "./constants";
-import { checkPublicInfo, createCustomRequest, decomposeGrievance, generateDraft } from "./mocks";
+import {
+  checkPublicInfo,
+  createCase,
+  createCustomRequest,
+  decomposeGrievance,
+  generateDraft,
+  getClarifyQuestions,
+} from "./mocks";
 import {
   ClarifyStep,
   DescribeStep,
@@ -25,6 +32,7 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
   );
   const [grievanceError, setGrievanceError] = useState("");
 
+  const [clarifyQuestions, setClarifyQuestions] = useState<ClarifyQuestion[]>([]);
   const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>(
     followUp ? { period: followUp.requests[0]?.period ?? "Last 1 year", knowsAuthority: "yes" } : {},
   );
@@ -57,22 +65,34 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
       return;
     }
     setGrievanceError("");
-    setStep("clarify");
+    setIsLoading(true);
+    createCase(grievance)
+      .then((newCaseId) => {
+        setCaseId(newCaseId);
+        return getClarifyQuestions(newCaseId);
+      })
+      .then((questions) => {
+        setClarifyQuestions(questions);
+        setStep("clarify");
+      })
+      .catch(() => {
+        setGrievanceError("We couldn't reach the server. Please try again.");
+      })
+      .finally(() => setIsLoading(false));
   }
 
   function handleClarifyContinue() {
-    if (!clarificationAnswers.period || !clarificationAnswers.knowsAuthority) {
-      setClarifyError("Please answer both questions before continuing.");
+    if (clarifyQuestions.some((question) => !clarificationAnswers[question.key])) {
+      setClarifyError("Please answer every question before continuing.");
       return;
     }
     setClarifyError("");
     setIsLoading(true);
-    decomposeGrievance(grievance, clarificationAnswers)
-      .then(({ requests: result, caseId: newCaseId }) => {
+    decomposeGrievance(caseId, clarificationAnswers)
+      .then((result) => {
         // Re-decomposing replaces only system-generated requests; the citizen's
         // own and follow-up requests are kept.
         setRequests((prev) => [...result, ...prev.filter((r) => r.source !== "generated")]);
-        if (newCaseId) setCaseId(newCaseId);
         setStep("requests");
       })
       .catch(() => {
@@ -178,6 +198,7 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
 
           {step === "clarify" && (
             <ClarifyStep
+              questions={clarifyQuestions}
               answers={clarificationAnswers}
               onSelect={(key, value) =>
                 setClarificationAnswers((prev) => ({ ...prev, [key]: value }))
@@ -214,7 +235,10 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
           </SecondaryButton>
 
           {step === "describe" && (
-            <PrimaryButton onClick={handleDescribeContinue}>Continue</PrimaryButton>
+            <PrimaryButton onClick={handleDescribeContinue} disabled={isLoading}>
+              {isLoading && <Loader2 size={14} className="animate-spin" />}
+              Continue
+            </PrimaryButton>
           )}
           {step === "clarify" && (
             <PrimaryButton onClick={handleClarifyContinue} disabled={isLoading}>

@@ -24,14 +24,11 @@ export const CASE_STATUS: Record<StepId, string> = {
   draft: "DRAFT_READY",
 };
 
+// Matches the mock clarify questions' default period options in mocks.ts and
+// app/services/drafting/mock.py — keep all three in sync.
 export const PERIOD_OPTIONS = [
   "Last 6 months",
   "Last 1 year",
   "Last 2 years",
   "More than 2 years",
-];
-
-export const AUTHORITY_OPTIONS = [
-  { value: "yes", label: "Yes, I know the department" },
-  { value: "no", label: "No, not sure" },
 ];

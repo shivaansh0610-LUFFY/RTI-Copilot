@@ -16,6 +16,12 @@ export interface PublicSource {
   url: string;
 }
 
+export interface ClarifyQuestion {
+  key: string;
+  question: string;
+  options: string[];
+}
+
 export interface DraftResult {
   draftText: string;
   charCount: number;

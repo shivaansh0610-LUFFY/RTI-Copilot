@@ -2,6 +2,12 @@ from app.schemas.base import ApiModel
 from app.schemas.requests import InformationRequest
 
 
+class ClarifyQuestion(ApiModel):
+    key: str
+    question: str
+    options: list[str]
+
+
 class DecomposeBody(ApiModel):
     clarification: dict[str, str] = {}
 

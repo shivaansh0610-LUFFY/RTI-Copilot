@@ -2,6 +2,47 @@ from app.schemas import InformationRequest
 from app.services.drafting import real
 
 
+def test_generate_clarify_questions_parses_llm_response(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda system, user, **kwargs: [
+            {"key": "period", "question": "What time period?", "options": ["Last 1 year", "Last 2 years"]},
+            {"key": "location", "question": "Where is the pothole?", "options": ["Main road", "Side street"]},
+        ],
+    )
+
+    questions = real.generate_clarify_questions("There is a pothole")
+
+    assert [q.key for q in questions] == ["period", "location"]
+    assert questions[1].question == "Where is the pothole?"
+    assert questions[1].options == ["Main road", "Side street"]
+
+
+def test_generate_clarify_questions_falls_back_to_mock_on_bad_response(monkeypatch):
+    def raise_bad_json(*args, **kwargs):
+        raise ValueError("Model did not return valid JSON")
+
+    monkeypatch.setattr(real.llm, "complete_json", raise_bad_json)
+
+    questions = real.generate_clarify_questions("There is a pothole")
+
+    assert questions == real.mock.generate_clarify_questions("There is a pothole")
+
+
+def test_generate_clarify_questions_falls_back_when_period_question_missing(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [{"key": "location", "question": "Where?", "options": ["A", "B"]}],
+    )
+
+    questions = real.generate_clarify_questions("There is a pothole")
+
+    # A missing required "period" question is treated as a bad response, not accepted as-is.
+    assert questions == real.mock.generate_clarify_questions("There is a pothole")
+
+
 def test_decompose_grievance_parses_llm_response(monkeypatch):
     monkeypatch.setattr(
         real.llm,
@@ -32,6 +73,23 @@ def test_decompose_grievance_falls_back_to_mock_on_bad_response(monkeypatch):
 
     # Falls back to the deterministic mock rather than letting the endpoint 500.
     assert requests == real.mock.decompose_grievance("The road is broken", {"period": "Last 1 year"})
+
+
+def test_decompose_grievance_passes_every_clarification_answer_as_context(monkeypatch):
+    seen_prompts = []
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda system, user, **kwargs: seen_prompts.append(user)
+        or [{"category": "Work order", "title": "x", "quality": "good"}],
+    )
+
+    real.decompose_grievance(
+        "There is a pothole", {"period": "Last 1 year", "location": "Main road"}
+    )
+
+    assert "location: Main road" in seen_prompts[0]
+    assert "period: Last 1 year" in seen_prompts[0]
 
 
 def test_decompose_grievance_falls_back_on_empty_array(monkeypatch):

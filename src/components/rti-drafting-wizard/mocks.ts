@@ -1,4 +1,5 @@
-import type { DraftResult, InformationRequest } from "../../types";
+import type { ClarifyQuestion, DraftResult, InformationRequest } from "../../types";
+import { PERIOD_OPTIONS } from "./constants";
 
 // Backend calls — each is a single async function. The ones still mocked are a
 // one-line swap for a real API call later: replace the body, keep the signature.
@@ -20,20 +21,37 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
-// POST /cases, then POST /cases/:id/decompose. The returned caseId threads through
-// checkPublicInfo and generateDraft below, since their real endpoints are case-scoped too.
+// POST /cases. The returned caseId threads through getClarifyQuestions, decomposeGrievance,
+// checkPublicInfo and generateDraft below, since their real endpoints are case-scoped.
+export async function createCase(grievance: string): Promise<string | undefined> {
+  if (!API_URL) return undefined;
+  const { caseId } = await postJson<{ caseId: string }>("/cases", { grievanceText: grievance });
+  return caseId;
+}
+
+// POST /cases/:id/clarify-questions
+export async function getClarifyQuestions(caseId: string | undefined): Promise<ClarifyQuestion[]> {
+  if (API_URL && caseId) {
+    return postJson<ClarifyQuestion[]>(`/cases/${caseId}/clarify-questions`, {});
+  }
+
+  return [
+    { key: "period", question: "What time period does this relate to?", options: PERIOD_OPTIONS },
+    {
+      key: "knowsAuthority",
+      question: "Do you know which government department is responsible?",
+      options: ["Yes, I know the department", "No, not sure"],
+    },
+  ];
+}
+
+// POST /cases/:id/decompose
 export async function decomposeGrievance(
-  grievance: string,
+  caseId: string | undefined,
   clarification: Record<string, string>,
-): Promise<{ requests: InformationRequest[]; caseId?: string }> {
-  if (API_URL) {
-    const { caseId } = await postJson<{ caseId: string }>("/cases", {
-      grievanceText: grievance,
-    });
-    const requests = await postJson<InformationRequest[]>(`/cases/${caseId}/decompose`, {
-      clarification,
-    });
-    return { requests, caseId };
+): Promise<InformationRequest[]> {
+  if (API_URL && caseId) {
+    return postJson<InformationRequest[]>(`/cases/${caseId}/decompose`, { clarification });
   }
 
   const period = clarification.period ?? "Last 1 year";
@@ -66,7 +84,7 @@ export async function decomposeGrievance(
       source: "generated",
     },
   ];
-  return { requests };
+  return requests;
 }
 
 // Replace with: POST /cases/:id/requests

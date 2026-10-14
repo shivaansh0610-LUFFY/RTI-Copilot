@@ -1,7 +1,6 @@
 import { AlertTriangle, ExternalLink, FileText, Loader2, Plus } from "lucide-react";
 import { useState } from "react";
-import type { DraftResult, InformationRequest } from "../../types";
-import { AUTHORITY_OPTIONS, PERIOD_OPTIONS } from "./constants";
+import type { ClarifyQuestion, DraftResult, InformationRequest } from "../../types";
 import {
   CategoryBadge,
   PrimaryButton,
@@ -38,61 +37,40 @@ export function DescribeStep({
 }
 
 export function ClarifyStep({
+  questions,
   answers,
   onSelect,
   error,
 }: {
+  questions: ClarifyQuestion[];
   answers: Record<string, string>;
   onSelect: (key: string, value: string) => void;
   error: string;
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-slate-900">
-          What time period does this relate to?
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {PERIOD_OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onSelect("period", option)}
-              className={
-                "rounded-full border px-3 py-1.5 text-sm " +
-                (answers.period === option
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-300 text-slate-700")
-              }
-            >
-              {option}
-            </button>
-          ))}
+      {questions.map((question) => (
+        <div key={question.key} className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-slate-900">{question.question}</label>
+          <div className="flex flex-wrap gap-2">
+            {question.options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onSelect(question.key, option)}
+                className={
+                  "rounded-full border px-3 py-1.5 text-sm " +
+                  (answers[question.key] === option
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-300 text-slate-700")
+                }
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-slate-900">
-          Do you know which government department is responsible?
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {AUTHORITY_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onSelect("knowsAuthority", option.value)}
-              className={
-                "rounded-full border px-3 py-1.5 text-sm " +
-                (answers.knowsAuthority === option.value
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-300 text-slate-700")
-              }
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      ))}
 
       {error && <p className="text-[13px] text-red-600">{error}</p>}
     </div>

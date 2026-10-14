@@ -4,9 +4,26 @@ Each function is replaced by the real implementation in this package; keep the
 signatures so the routers don't change.
 """
 
-from app.schemas import InformationRequest, PublicSource
+from app.schemas import ClarifyQuestion, InformationRequest, PublicSource
 
 DEFAULT_AUTHORITY = "Public Works Department (PWD), Ward Division Office"
+
+PERIOD_OPTIONS = ["Last 6 months", "Last 1 year", "Last 2 years", "More than 2 years"]
+
+
+def generate_clarify_questions(_grievance: str) -> list[ClarifyQuestion]:
+    return [
+        ClarifyQuestion(
+            key="period",
+            question="What time period does this relate to?",
+            options=PERIOD_OPTIONS,
+        ),
+        ClarifyQuestion(
+            key="knowsAuthority",
+            question="Do you know which government department is responsible?",
+            options=["Yes, I know the department", "No, not sure"],
+        ),
+    ]
 
 
 def decompose_grievance(
