@@ -16,6 +16,7 @@ Paragraphs with no letters in them (a lone page number) are dropped.
 import logging
 import re
 from pathlib import Path
+from typing import BinaryIO
 
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
@@ -57,18 +58,20 @@ def extract_pages(path: Path) -> list[str]:
     raise ExtractionError(f"unsupported file type {suffix or '(none)'}: {path.name}")
 
 
-def pdf_pages(path: Path) -> list[str]:
+def pdf_pages(source: Path | BinaryIO) -> list[str]:
+    """The text of each page of a PDF file, or of PDF bytes held in a binary stream."""
+    name = source.name if isinstance(source, Path) else "downloaded PDF"
     try:
-        reader = PdfReader(path)
+        reader = PdfReader(source)
         pages = []
         for number, page in enumerate(reader.pages, start=1):
             try:
                 pages.append(page.extract_text() or "")
             except Exception as error:  # pypdf raises many types on damaged pages; say which page
-                raise ExtractionError(f"{path.name}: could not read page {number}: {error}") from error
+                raise ExtractionError(f"{name}: could not read page {number}: {error}") from error
         return pages
     except PyPdfError as error:
-        raise ExtractionError(f"{path.name}: not a readable PDF: {error}") from error
+        raise ExtractionError(f"{name}: not a readable PDF: {error}") from error
 
 
 def html_text(raw: bytes) -> str:

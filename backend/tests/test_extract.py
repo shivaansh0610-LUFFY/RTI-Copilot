@@ -1,3 +1,5 @@
+import io
+
 import pytest
 from corpus_support import clause, make_pdf
 
@@ -8,6 +10,7 @@ from ingest.extract import (
     ExtractionError,
     extract_pages,
     html_text,
+    pdf_pages,
     split_paragraphs,
 )
 
@@ -133,6 +136,20 @@ def test_pdf_pages_come_back_in_order(tmp_path):
     assert "First page line one" in pages[0] and "line two" in pages[0]
     assert pages[1].strip() == ""
     assert "Third page" in pages[2]
+
+
+def test_pdf_pages_can_read_a_stream_as_well_as_a_file():
+    stream = io.BytesIO(make_pdf([["First page"], ["Second page"]]))
+
+    pages = pdf_pages(stream)
+
+    assert len(pages) == 2
+    assert "First page" in pages[0] and "Second page" in pages[1]
+
+
+def test_a_stream_that_is_not_a_pdf_is_reported():
+    with pytest.raises(ExtractionError, match="downloaded PDF: not a readable PDF"):
+        pdf_pages(io.BytesIO(b"this is not a pdf at all"))
 
 
 def test_pdf_with_parentheses_in_the_text(tmp_path):
