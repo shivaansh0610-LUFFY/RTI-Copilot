@@ -1,6 +1,7 @@
-import { AlertTriangle, ExternalLink, FileText, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, ExternalLink, FileText, Loader2, MapPin, Plus } from "lucide-react";
 import { useState } from "react";
 import type { ClarifyQuestion, DraftResult, InformationRequest } from "../../types";
+import { reverseGeocode } from "./mocks";
 import {
   CategoryBadge,
   PrimaryButton,
@@ -19,11 +20,62 @@ export function DescribeStep({
   onChange: (value: string) => void;
   error: string;
 }) {
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [locationError, setLocationError] = useState("");
+
+  function handleUseLocation() {
+    if (!navigator.geolocation) {
+      setLocationError("Your browser doesn't support location detection.");
+      return;
+    }
+    setLocationError("");
+    setIsDetecting(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        reverseGeocode(position.coords.latitude, position.coords.longitude)
+          .then((address) => {
+            if (!address) {
+              setLocationError(
+                "Couldn't detect your address. Please mention the location in your description instead.",
+              );
+              return;
+            }
+            const trimmed = grievance.trim();
+            onChange(trimmed ? `${trimmed}\n\nLocation: ${address}` : `Location: ${address}`);
+          })
+          .catch(() => {
+            setLocationError(
+              "Couldn't detect your address. Please mention the location in your description instead.",
+            );
+          })
+          .finally(() => setIsDetecting(false));
+      },
+      () => {
+        setLocationError(
+          "Location permission denied or unavailable. Please mention the location in your description instead.",
+        );
+        setIsDetecting(false);
+      },
+      { timeout: 10_000 },
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-slate-900">
-        Describe your issue in plain language
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-slate-900">
+          Describe your issue in plain language
+        </label>
+        <button
+          type="button"
+          onClick={handleUseLocation}
+          disabled={isDetecting}
+          className="flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-400 disabled:opacity-60"
+        >
+          {isDetecting ? <Loader2 size={13} className="animate-spin" /> : <MapPin size={13} />}
+          Use my current location
+        </button>
+      </div>
       <textarea
         value={grievance}
         onChange={(e) => onChange(e.target.value)}
@@ -31,6 +83,7 @@ export function DescribeStep({
         placeholder="e.g. The road in front of my house has been broken for two years and no one has repaired it..."
         className="rounded-md border border-slate-300 p-3 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
       />
+      {locationError && <p className="text-[13px] text-amber-600">{locationError}</p>}
       {error && <p className="text-[13px] text-red-600">{error}</p>}
     </div>
   );

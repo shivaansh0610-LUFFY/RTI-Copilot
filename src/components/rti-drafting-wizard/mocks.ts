@@ -21,6 +21,13 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return response.json();
 }
 
+// POST /geocode. Browser-only demo mode (no VITE_API_URL) can't reverse-geocode for real.
+export async function reverseGeocode(latitude: number, longitude: number): Promise<string | undefined> {
+  if (!API_URL) return undefined;
+  const { address } = await postJson<{ address: string }>("/geocode", { latitude, longitude });
+  return address;
+}
+
 // POST /cases. The returned caseId threads through getClarifyQuestions, decomposeGrievance,
 // checkPublicInfo and generateDraft below, since their real endpoints are case-scoped.
 export async function createCase(grievance: string): Promise<string | undefined> {
