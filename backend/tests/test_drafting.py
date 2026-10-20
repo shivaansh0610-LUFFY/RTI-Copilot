@@ -12,7 +12,9 @@ def decompose(client, case_id):
 def test_clarify_questions_returns_the_mock_questions(client, case_id):
     response = client.post(f"/cases/{case_id}/clarify-questions")
     assert response.status_code == 200
-    questions = response.json()
+    body = response.json()
+    assert body["answers"] == {}
+    questions = body["questions"]
     assert [q["key"] for q in questions] == ["period", "knowsAuthority"]
     for question in questions:
         assert question["question"]

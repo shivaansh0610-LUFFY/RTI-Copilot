@@ -5,7 +5,7 @@ from app import case_store
 from app.config import get_settings
 from app.models import Case
 from app.routers.cases import CaseDep, SessionDep
-from app.schemas import ClarifyQuestion, DecomposeBody, DraftResponse, InformationRequest, RequestsBody
+from app.schemas import ClarifyResult, DecomposeBody, DraftResponse, InformationRequest, RequestsBody
 from app.services.drafting import mock, real
 from app.services.drafting.specificity import is_vague
 
@@ -25,9 +25,9 @@ def _save_requests(case: Case, requests: list[InformationRequest], session: Sess
         raise HTTPException(422, str(error)) from error
 
 
-@router.post("/clarify-questions", response_model=list[ClarifyQuestion])
-def clarify_questions(case: CaseDep) -> list[ClarifyQuestion]:
-    generate = real.generate_clarify_questions if get_settings().use_llm_drafting else mock.generate_clarify_questions
+@router.post("/clarify-questions", response_model=ClarifyResult)
+def clarify_questions(case: CaseDep) -> ClarifyResult:
+    generate = real.generate_clarify_result if get_settings().use_llm_drafting else mock.generate_clarify_result
     return generate(case.grievance_text)
 
 

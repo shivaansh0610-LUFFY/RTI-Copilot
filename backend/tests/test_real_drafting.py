@@ -2,45 +2,60 @@ from app.schemas import InformationRequest
 from app.services.drafting import real
 
 
-def test_generate_clarify_questions_parses_llm_response(monkeypatch):
+def test_generate_clarify_result_parses_questions_and_answers(monkeypatch):
     monkeypatch.setattr(
         real.llm,
         "complete_json",
-        lambda system, user, **kwargs: [
-            {"key": "period", "question": "What time period?", "options": ["Last 1 year", "Last 2 years"]},
-            {"key": "location", "question": "Where is the pothole?", "options": ["Main road", "Side street"]},
-        ],
+        lambda system, user, **kwargs: {
+            "answers": {"period": "Last 2 months"},
+            "questions": [
+                {"key": "location", "question": "Where is the pothole?", "options": ["Main road", "Side street"]},
+            ],
+        },
     )
 
-    questions = real.generate_clarify_questions("There is a pothole")
+    result = real.generate_clarify_result("Pothole since 2 months")
 
-    assert [q.key for q in questions] == ["period", "location"]
-    assert questions[1].question == "Where is the pothole?"
-    assert questions[1].options == ["Main road", "Side street"]
+    assert result.answers == {"period": "Last 2 months"}
+    assert [q.key for q in result.questions] == ["location"]
+    assert result.questions[0].options == ["Main road", "Side street"]
 
 
-def test_generate_clarify_questions_falls_back_to_mock_on_bad_response(monkeypatch):
+def test_generate_clarify_result_allows_no_questions_when_everything_is_known(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: {"answers": {"period": "Last 2 months"}, "questions": []},
+    )
+
+    result = real.generate_clarify_result("Pothole since 2 months on Main Road")
+
+    assert result.answers == {"period": "Last 2 months"}
+    assert result.questions == []
+
+
+def test_generate_clarify_result_falls_back_to_mock_on_bad_response(monkeypatch):
     def raise_bad_json(*args, **kwargs):
         raise ValueError("Model did not return valid JSON")
 
     monkeypatch.setattr(real.llm, "complete_json", raise_bad_json)
 
-    questions = real.generate_clarify_questions("There is a pothole")
+    result = real.generate_clarify_result("There is a pothole")
 
-    assert questions == real.mock.generate_clarify_questions("There is a pothole")
+    assert result == real.mock.generate_clarify_result("There is a pothole")
 
 
-def test_generate_clarify_questions_falls_back_when_period_question_missing(monkeypatch):
+def test_generate_clarify_result_falls_back_when_period_resolved_nowhere(monkeypatch):
     monkeypatch.setattr(
         real.llm,
         "complete_json",
-        lambda *a, **k: [{"key": "location", "question": "Where?", "options": ["A", "B"]}],
+        lambda *a, **k: {"answers": {}, "questions": [{"key": "location", "question": "Where?", "options": ["A", "B"]}]},
     )
 
-    questions = real.generate_clarify_questions("There is a pothole")
+    result = real.generate_clarify_result("There is a pothole")
 
-    # A missing required "period" question is treated as a bad response, not accepted as-is.
-    assert questions == real.mock.generate_clarify_questions("There is a pothole")
+    # "period" missing from both answers and questions is treated as a bad response.
+    assert result == real.mock.generate_clarify_result("There is a pothole")
 
 
 def test_decompose_grievance_parses_llm_response(monkeypatch):

@@ -4,14 +4,20 @@ Each function is replaced by the real implementation in this package; keep the
 signatures so the routers don't change.
 """
 
-from app.schemas import ClarifyQuestion, InformationRequest, PublicSource
+from app.schemas import ClarifyQuestion, ClarifyResult, InformationRequest, PublicSource
 
 DEFAULT_AUTHORITY = "Public Works Department (PWD), Ward Division Office"
 
 PERIOD_OPTIONS = ["Last 6 months", "Last 1 year", "Last 2 years", "More than 2 years"]
 
 
-def generate_clarify_questions(_grievance: str) -> list[ClarifyQuestion]:
+def generate_clarify_result(_grievance: str) -> ClarifyResult:
+    # The mock doesn't try to extract anything from the grievance; it's the deterministic
+    # fallback, not the smart path. Real extraction is real.generate_clarify_result's job.
+    return ClarifyResult(questions=_fixed_questions())
+
+
+def _fixed_questions() -> list[ClarifyQuestion]:
     return [
         ClarifyQuestion(
             key="period",

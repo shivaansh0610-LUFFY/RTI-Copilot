@@ -1,4 +1,4 @@
-import type { ClarifyQuestion, DraftResult, InformationRequest } from "../../types";
+import type { ClarifyResult, DraftResult, InformationRequest } from "../../types";
 import { PERIOD_OPTIONS } from "./constants";
 
 // Backend calls — each is a single async function. The ones still mocked are a
@@ -30,19 +30,22 @@ export async function createCase(grievance: string): Promise<string | undefined>
 }
 
 // POST /cases/:id/clarify-questions
-export async function getClarifyQuestions(caseId: string | undefined): Promise<ClarifyQuestion[]> {
+export async function getClarifyQuestions(caseId: string | undefined): Promise<ClarifyResult> {
   if (API_URL && caseId) {
-    return postJson<ClarifyQuestion[]>(`/cases/${caseId}/clarify-questions`, {});
+    return postJson<ClarifyResult>(`/cases/${caseId}/clarify-questions`, {});
   }
 
-  return [
-    { key: "period", question: "What time period does this relate to?", options: PERIOD_OPTIONS },
-    {
-      key: "knowsAuthority",
-      question: "Do you know which government department is responsible?",
-      options: ["Yes, I know the department", "No, not sure"],
-    },
-  ];
+  return {
+    answers: {},
+    questions: [
+      { key: "period", question: "What time period does this relate to?", options: PERIOD_OPTIONS },
+      {
+        key: "knowsAuthority",
+        question: "Do you know which government department is responsible?",
+        options: ["Yes, I know the department", "No, not sure"],
+      },
+    ],
+  };
 }
 
 // POST /cases/:id/decompose

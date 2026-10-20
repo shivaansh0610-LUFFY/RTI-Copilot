@@ -22,6 +22,13 @@ export interface ClarifyQuestion {
   options: string[];
 }
 
+export interface ClarifyResult {
+  // Extracted straight from the grievance, no need to ask (pre-filled into the answers).
+  answers: Record<string, string>;
+  // Only what's genuinely still missing. Can be empty if the grievance said everything needed.
+  questions: ClarifyQuestion[];
+}
+
 export interface DraftResult {
   draftText: string;
   charCount: number;

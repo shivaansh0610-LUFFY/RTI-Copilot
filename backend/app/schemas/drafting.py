@@ -8,6 +8,14 @@ class ClarifyQuestion(ApiModel):
     options: list[str]
 
 
+class ClarifyResult(ApiModel):
+    # Extracted straight from the grievance, no need to ask (e.g. the grievance already
+    # states "since 2 months", so answers={"period": "Last 2 months"} with no period question).
+    answers: dict[str, str] = {}
+    # Only what's genuinely still missing. Can be empty if the grievance said everything needed.
+    questions: list[ClarifyQuestion] = []
+
+
 class DecomposeBody(ApiModel):
     clarification: dict[str, str] = {}
 

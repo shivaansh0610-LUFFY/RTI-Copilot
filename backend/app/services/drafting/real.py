@@ -5,7 +5,7 @@ breaks the endpoint for the citizen filing a request.
 
 import logging
 
-from app.schemas import ClarifyQuestion, InformationRequest
+from app.schemas import ClarifyQuestion, ClarifyResult, InformationRequest
 from app.services import llm, public_info
 from app.services.drafting import mock
 from app.services.drafting.mock import DEFAULT_AUTHORITY
@@ -16,19 +16,27 @@ CLARIFY_SYSTEM_PROMPT = """You help a citizen in Delhi file a Right to Informati
 Act, 2005 application against the Public Works Department (PWD), Government of NCT of \
 Delhi, about a road-infrastructure grievance (e.g. a pothole or an unrepaired road).
 
-Read the grievance and decide what is genuinely missing before it can be broken down into \
-specific RTI information requests — for example the exact location, when the problem \
-started or was last noticed, whether the citizen already knows which department is \
-responsible, or what kind of record they most want (a work order, an inspection report, \
-spending figures). Do not ask about things the grievance already states.
+Read the grievance and work out, for a request to be properly drafted, what is already \
+known and what is genuinely still missing — for example the exact location, how long the \
+problem has lasted, whether the citizen already knows which department is responsible, or \
+what kind of record they most want (a work order, an inspection report, spending figures).
 
-Respond with ONLY a JSON array, no prose, no markdown fences, of 1 to 3 questions. Each item:
-{"key": "<short camelCase id, e.g. period, location, knowsAuthority>", \
-"question": "<the question text>", "options": ["<2 to 4 short selectable answers, not free text>"]}
-Exactly one item MUST have "key": "period" with options drawn from or similar to \
-["Last 6 months", "Last 1 year", "Last 2 years", "More than 2 years"], since every \
-request needs a time period. The rest should be whatever is actually missing for this \
-specific grievance — skip a question if the grievance already answers it."""
+Respond with ONLY one JSON object, no prose, no markdown fences:
+{"answers": {"<key>": "<value>", ...}, "questions": [{"key": "...", "question": "...", \
+"options": ["...", "..."]}, ...]}
+
+"answers" holds anything the grievance ALREADY states clearly, in your own normalized \
+words — put it there directly and do NOT also ask a question about it. For example, if \
+the grievance says "since 2 months", put {"period": "Last 2 months"} in answers and do \
+not include a period question. If it names a street, put the location in answers too.
+
+"questions" holds only what is genuinely still missing, 0 to 3 of them. The citizen can \
+only click one of your options — there is no text box, so never write an option like \
+"Other (specify)" or "Something else" that expects them to type an answer; every option \
+must be a complete, useful answer on its own. A time period is always needed, so if the \
+grievance does not already state one clearly enough for "answers", include a period \
+question with generic buckets like ["Last 6 months", "Last 1 year", "Last 2 years", \
+"More than 2 years"] — but never ask it if "answers" already has "period"."""
 
 DECOMPOSE_SYSTEM_PROMPT = """You help a citizen in Delhi file a Right to Information \
 (RTI) Act, 2005 application against the Public Works Department (PWD), Government of \
@@ -53,26 +61,27 @@ order sanctioning the repair, amount spent, inspection/quality-check reports —
 apply)."""
 
 
-def generate_clarify_questions(grievance: str) -> list[ClarifyQuestion]:
+def generate_clarify_result(grievance: str) -> ClarifyResult:
     try:
-        items = llm.complete_json(CLARIFY_SYSTEM_PROMPT, f"Grievance: {grievance}")
-        if not isinstance(items, list) or not items:
-            raise ValueError(f"Expected a non-empty JSON array, got: {items!r}")
+        payload = llm.complete_json(CLARIFY_SYSTEM_PROMPT, f"Grievance: {grievance}")
+        if not isinstance(payload, dict):
+            raise ValueError(f"Expected a JSON object, got: {payload!r}")
 
+        answers = {str(key): str(value) for key, value in dict(payload.get("answers") or {}).items()}
         questions = [
             ClarifyQuestion(
                 key=str(item["key"]),
                 question=str(item["question"]),
                 options=[str(option) for option in item["options"]],
             )
-            for item in items
+            for item in payload.get("questions") or []
         ]
-        if not any(question.key == "period" for question in questions):
-            raise ValueError("Model did not include a required 'period' question")
-        return questions
+        if "period" not in answers and not any(question.key == "period" for question in questions):
+            raise ValueError("Model resolved 'period' neither in answers nor as a question")
+        return ClarifyResult(answers=answers, questions=questions)
     except Exception:
-        logger.warning("LLM clarify-question generation failed, falling back to mock", exc_info=True)
-        return mock.generate_clarify_questions(grievance)
+        logger.warning("LLM clarify-result generation failed, falling back to mock", exc_info=True)
+        return mock.generate_clarify_result(grievance)
 
 
 def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[InformationRequest]:

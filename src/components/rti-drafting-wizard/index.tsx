@@ -67,14 +67,24 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
     setGrievanceError("");
     setIsLoading(true);
     createCase(grievance)
-      .then((newCaseId) => {
-        setCaseId(newCaseId);
-        return getClarifyQuestions(newCaseId);
-      })
-      .then((questions) => {
-        setClarifyQuestions(questions);
-        setStep("clarify");
-      })
+      .then((newCaseId) =>
+        getClarifyQuestions(newCaseId).then((result) => {
+          setCaseId(newCaseId);
+          // Anything the grievance already stated is pre-filled, not asked again.
+          const mergedAnswers = { ...clarificationAnswers, ...result.answers };
+          setClarificationAnswers(mergedAnswers);
+          setClarifyQuestions(result.questions);
+
+          if (result.questions.length === 0) {
+            // Nothing left to ask — skip straight to generating requests.
+            return decomposeGrievance(newCaseId, mergedAnswers).then((decomposed) => {
+              setRequests((prev) => [...decomposed, ...prev.filter((r) => r.source !== "generated")]);
+              setStep("requests");
+            });
+          }
+          setStep("clarify");
+        }),
+      )
       .catch(() => {
         setGrievanceError("We couldn't reach the server. Please try again.");
       })
