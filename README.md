@@ -80,7 +80,20 @@ npm run dev
 ```
 
 With `VITE_API_URL` unset the UI runs on built-in mock data and needs no
-backend.
+backend. `npm test` runs the frontend tests (Vitest), `npm run lint` the linter.
+
+*Photo and location* (Describe step): "Take a photo" opens the phone's camera
+(a computer shows a file picker) and then asks the browser for the device's
+position; the browser shows its own permission prompt. The person confirms the
+spot on an OpenStreetMap map by dragging the pin or tapping the map. The street
+name comes from the backend's `/geocode`, and the result reaches the backend
+only as a `Location:` line in the grievance text. **The photo itself never
+leaves the browser.** No API key is needed. Two things to know when trying it:
+browsers only give a location to `https://` pages (and `localhost`), so test
+from a phone over https, for example through a tunnel; and the map uses
+OpenStreetMap's free public tiles, which suit a demo, so a busy deployment
+should switch to a tile provider it has an agreement with (`TILES` in
+`LocationMap.tsx`).
 
 **Backend** (FastAPI, in `backend/`):
 
