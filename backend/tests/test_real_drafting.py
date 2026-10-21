@@ -115,6 +115,80 @@ def test_decompose_grievance_falls_back_on_empty_array(monkeypatch):
     assert requests == real.mock.decompose_grievance("The road is broken", {})
 
 
+def test_decompose_grievance_falls_back_when_a_title_invents_a_calendar_date(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [
+            {
+                "category": "Work order",
+                "title": "Work order issued between 1 July 2023 and 30 September 2023",
+                "quality": "good",
+            }
+        ],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+    assert requests == real.mock.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+
+def test_decompose_grievance_falls_back_when_a_title_invents_just_a_year(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [{"category": "Work order", "title": "Work order issued in 2023", "quality": "good"}],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {})
+
+    assert requests == real.mock.decompose_grievance("The road is broken", {})
+
+
+def test_decompose_grievance_falls_back_when_a_title_has_a_bracketed_placeholder(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [
+            {
+                "category": "Work order",
+                "title": "Work order for street light pole number [pole number]",
+                "quality": "good",
+            }
+        ],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {})
+
+    assert requests == real.mock.decompose_grievance("The road is broken", {})
+
+
+def test_decompose_grievance_falls_back_when_a_title_states_a_duration(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [
+            {"category": "Maintenance log", "title": "Maintenance log for the past six months", "quality": "good"}
+        ],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+    assert requests == real.mock.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+
+def test_decompose_grievance_allows_a_period_free_title(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [{"category": "Work order", "title": "Copy of the work order", "quality": "good"}],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+    assert requests[0].title == "Copy of the work order"
+
+
 SAMPLE_REQUEST = InformationRequest(
     id="RQ-001",
     category="Work order",
