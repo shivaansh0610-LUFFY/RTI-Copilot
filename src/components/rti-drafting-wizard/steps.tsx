@@ -266,7 +266,7 @@ export function PublicCheckStep({ requests }: { requests: InformationRequest[] }
             )
           }
         >
-          {request.publiclyAvailable && request.publicSource && (
+          {request.publiclyAvailable && request.publicSource ? (
             <a
               href={request.publicSource.url}
               target="_blank"
@@ -279,6 +279,10 @@ export function PublicCheckStep({ requests }: { requests: InformationRequest[] }
                 <span className="truncate text-slate-500">{request.publicSource.url}</span>
               </span>
             </a>
+          ) : (
+            <p className="mt-3 text-xs text-slate-400">
+              No matching public source found — you'll need to file this one.
+            </p>
           )}
         </RequestCard>
       ))}

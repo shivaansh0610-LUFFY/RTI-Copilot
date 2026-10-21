@@ -150,7 +150,7 @@ export async function generateDraft(
 
   const draftText = requests
     .map(
-      (request) => `Subject: Request for information regarding "${request.title}"
+      (request) => `Subject: Application under the Right to Information Act, 2005 — ${request.category}
 Authority: ${request.authority}
 Particulars of information sought: ${request.title}
 Period: ${request.period}
