@@ -2,6 +2,7 @@ import { CornerDownRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ClarifyQuestion, DraftResult, FollowUpContext, InformationRequest } from "../../types";
 import { ALL_STEPS, CASE_STATUS, type StepId } from "./constants";
+import { locationLine, withLocationLine, type IssueLocation } from "./location";
 import {
   checkPublicInfo,
   createCase,
@@ -31,6 +32,10 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
       : "",
   );
   const [grievanceError, setGrievanceError] = useState("");
+  // The photo never leaves this browser. The location reaches the backend only as the
+  // "Location:" line kept in `grievance`.
+  const [photo, setPhoto] = useState<File | undefined>();
+  const [issueLocation, setIssueLocation] = useState<IssueLocation | undefined>();
 
   const [clarifyQuestions, setClarifyQuestions] = useState<ClarifyQuestion[]>([]);
   const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>(
@@ -59,8 +64,15 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
     [step, needsQualityReview],
   );
 
+  function handleLocationChange(location: IssueLocation | undefined) {
+    setIssueLocation(location);
+    // A function update, so words typed while the street name loads are not overwritten.
+    setGrievance((text) => withLocationLine(text, location && locationLine(location)));
+  }
+
   function handleDescribeContinue() {
-    if (grievance.trim().length < 10) {
+    // A location alone is not a description of the problem.
+    if (withLocationLine(grievance, undefined).trim().length < 10) {
       setGrievanceError("Please describe your issue in at least 10 characters.");
       return;
     }
@@ -203,7 +215,15 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
       <div className="flex min-h-[360px] flex-col rounded-md border border-slate-200">
         <div className="flex-1 p-6">
           {step === "describe" && (
-            <DescribeStep grievance={grievance} onChange={setGrievance} error={grievanceError} />
+            <DescribeStep
+              grievance={grievance}
+              onChange={setGrievance}
+              error={grievanceError}
+              photo={photo}
+              onPhotoChange={setPhoto}
+              location={issueLocation}
+              onLocationChange={handleLocationChange}
+            />
           )}
 
           {step === "clarify" && (

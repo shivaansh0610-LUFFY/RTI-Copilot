@@ -1,7 +1,9 @@
 import { AlertTriangle, ExternalLink, FileText, Loader2, MapPin, Plus } from "lucide-react";
 import { useState } from "react";
 import type { ClarifyQuestion, DraftResult, InformationRequest } from "../../types";
-import { reverseGeocode } from "./mocks";
+import type { IssueLocation } from "./location";
+import { PhotoLocation } from "./PhotoLocation";
+import { useLocationPicker } from "./use-location-picker";
 import {
   CategoryBadge,
   PrimaryButton,
@@ -15,50 +17,20 @@ export function DescribeStep({
   grievance,
   onChange,
   error,
+  photo,
+  onPhotoChange,
+  location,
+  onLocationChange,
 }: {
   grievance: string;
   onChange: (value: string) => void;
   error: string;
+  photo: File | undefined;
+  onPhotoChange: (photo: File | undefined) => void;
+  location: IssueLocation | undefined;
+  onLocationChange: (location: IssueLocation | undefined) => void;
 }) {
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [locationError, setLocationError] = useState("");
-
-  function handleUseLocation() {
-    if (!navigator.geolocation) {
-      setLocationError("Your browser doesn't support location detection.");
-      return;
-    }
-    setLocationError("");
-    setIsDetecting(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        reverseGeocode(position.coords.latitude, position.coords.longitude)
-          .then((address) => {
-            if (!address) {
-              setLocationError(
-                "Couldn't detect your address. Please mention the location in your description instead.",
-              );
-              return;
-            }
-            const trimmed = grievance.trim();
-            onChange(trimmed ? `${trimmed}\n\nLocation: ${address}` : `Location: ${address}`);
-          })
-          .catch(() => {
-            setLocationError(
-              "Couldn't detect your address. Please mention the location in your description instead.",
-            );
-          })
-          .finally(() => setIsDetecting(false));
-      },
-      () => {
-        setLocationError(
-          "Location permission denied or unavailable. Please mention the location in your description instead.",
-        );
-        setIsDetecting(false);
-      },
-      { timeout: 10_000 },
-    );
-  }
+  const picker = useLocationPicker(location, onLocationChange);
 
   return (
     <div className="flex flex-col gap-2">
@@ -68,11 +40,15 @@ export function DescribeStep({
         </label>
         <button
           type="button"
-          onClick={handleUseLocation}
-          disabled={isDetecting}
+          onClick={picker.locateDevice}
+          disabled={picker.isLocating}
           className="flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-400 disabled:opacity-60"
         >
-          {isDetecting ? <Loader2 size={13} className="animate-spin" /> : <MapPin size={13} />}
+          {picker.isLocating ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <MapPin size={13} />
+          )}
           Use my current location
         </button>
       </div>
@@ -83,8 +59,13 @@ export function DescribeStep({
         placeholder="e.g. The road in front of my house has been broken for two years and no one has repaired it..."
         className="rounded-md border border-slate-300 p-3 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
       />
-      {locationError && <p className="text-[13px] text-amber-600">{locationError}</p>}
       {error && <p className="text-[13px] text-red-600">{error}</p>}
+      <PhotoLocation
+        photo={photo}
+        onPhotoChange={onPhotoChange}
+        location={location}
+        picker={picker}
+      />
     </div>
   );
 }
