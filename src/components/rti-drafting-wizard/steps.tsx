@@ -1,6 +1,17 @@
-import { AlertTriangle, ExternalLink, FileText, Loader2, MapPin, Plus } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  Check,
+  Copy,
+  FileText,
+  Loader2,
+  MapPin,
+  Plus,
+  Printer,
+} from "lucide-react";
 import { useState } from "react";
-import type { ClarifyQuestion, DraftResult, InformationRequest } from "../../types";
+import { printText } from "../../print";
+import type { ClarifyQuestion, DraftLanguage, DraftResult, InformationRequest } from "../../types";
 import type { IssueLocation } from "./location";
 import { PhotoLocation } from "./PhotoLocation";
 import { useLocationPicker } from "./use-location-picker";
@@ -56,6 +67,8 @@ export function DescribeStep({
         value={grievance}
         onChange={(e) => onChange(e.target.value)}
         rows={6}
+        // The API takes 5,000 characters; this leaves room for the "Location:" line the map adds.
+        maxLength={4800}
         placeholder="e.g. The road in front of my house has been broken for two years and no one has repaired it..."
         className="rounded-md border border-slate-300 p-3 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
       />
@@ -177,6 +190,7 @@ export function RequestsStep({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               rows={2}
+              maxLength={1000}
               placeholder="e.g. Name of the contractor and the date the repair work was completed"
               className="rounded-md border border-slate-300 p-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
             />
@@ -194,6 +208,7 @@ export function RequestsStep({
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
+              maxLength={80}
               placeholder="e.g. Contract, Expenditure, Attendance"
               className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
             />
@@ -225,52 +240,6 @@ export function RequestsStep({
   );
 }
 
-export function PublicCheckStep({ requests }: { requests: InformationRequest[] }) {
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-slate-500">
-        We checked whether this information is already available from a public source.
-      </p>
-      {requests.map((request) => (
-        <RequestCard
-          key={request.id}
-          request={request}
-          rightSlot={
-            request.publiclyAvailable ? (
-              <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
-                Already public
-              </span>
-            ) : (
-              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                Include in RTI
-              </span>
-            )
-          }
-        >
-          {request.publiclyAvailable && request.publicSource ? (
-            <a
-              href={request.publicSource.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 flex items-start gap-2 rounded-md border border-slate-200 bg-white p-2 text-xs hover:border-slate-300"
-            >
-              <ExternalLink size={14} className="mt-0.5 shrink-0 text-blue-700" />
-              <span className="flex min-w-0 flex-col">
-                <span className="font-medium text-blue-700">{request.publicSource.title}</span>
-                <span className="truncate text-slate-500">{request.publicSource.url}</span>
-              </span>
-            </a>
-          ) : (
-            <p className="mt-3 text-xs text-slate-400">
-              No matching public source found — you'll need to file this one.
-            </p>
-          )}
-        </RequestCard>
-      ))}
-    </div>
-  );
-}
-
 export function QualityReviewStep({
   requests,
   onTitleChange,
@@ -294,6 +263,7 @@ export function QualityReviewStep({
             <input
               type="text"
               defaultValue={request.title}
+              maxLength={1000}
               onBlur={(e) => onTitleChange(request.id, e.target.value)}
               className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
             />
@@ -309,14 +279,44 @@ export function QualityReviewStep({
   );
 }
 
+const LANGUAGES: { code: DraftLanguage; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "hi", label: "हिंदी" },
+];
+
+// "12 Dec 2026", the date `days` after `from`.
+function dateAfter(from: Date, days: number): string {
+  const date = new Date(from);
+  date.setDate(date.getDate() + days);
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function DraftStep({
   draft,
   requests,
+  language,
+  onLanguageChange,
+  isUpdating,
 }: {
   draft: DraftResult;
   requests: InformationRequest[];
+  language: DraftLanguage;
+  onLanguageChange: (language: DraftLanguage) => void;
+  isUpdating: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
   const flaggedTitles = requests.filter((request) => draft.flaggedRequestIds.includes(request.id));
+  const today = new Date();
+
+  function copyDraft() {
+    navigator.clipboard
+      ?.writeText(draft.draftText)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => setCopied(false));
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -341,17 +341,69 @@ export function DraftStep({
         </div>
       )}
 
-      <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
-        <FileText size={18} className="text-slate-500" />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div role="group" aria-label="Draft language" className="flex gap-1">
+          {LANGUAGES.map(({ code, label }) => (
+            <button
+              key={code}
+              type="button"
+              aria-pressed={language === code}
+              disabled={isUpdating}
+              onClick={() => code !== language && onLanguageChange(code)}
+              className={
+                "rounded-full border px-3 py-1 text-xs font-medium disabled:opacity-60 " +
+                (language === code
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-300 text-slate-700")
+              }
+            >
+              {label}
+            </button>
+          ))}
+          {isUpdating && <Loader2 size={14} className="ml-1 animate-spin self-center text-slate-500" />}
+        </div>
+        <div className="flex gap-2">
+          <SecondaryButton onClick={copyDraft} disabled={isUpdating}>
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? "Copied" : "Copy draft"}
+          </SecondaryButton>
+          <SecondaryButton
+            onClick={() => printText("RTI application", draft.draftText)}
+            disabled={isUpdating}
+            aria-label="Print or save as PDF"
+          >
+            <Printer size={14} />
+            PDF
+          </SecondaryButton>
+        </div>
+      </div>
+
+      <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
+        <FileText size={18} className="shrink-0 text-slate-500" />
         <pre className="whitespace-pre-wrap font-mono text-xs text-slate-800">{draft.draftText}</pre>
       </div>
       <p className="text-right text-xs text-slate-400">
         {draft.charCount.toLocaleString()} / 3,000 characters
       </p>
 
+      <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-[13px] text-blue-900">
+        <CalendarClock size={16} className="mt-0.5 shrink-0" />
+        <div>
+          <p className="font-medium">If you file today ({dateAfter(today, 0)}):</p>
+          <ul className="mt-1 list-inside list-disc">
+            <li>The PIO must reply by {dateAfter(today, 30)} (Section 7(1)).</li>
+            <li>
+              No reply, or an incomplete one? You can file a first appeal until{" "}
+              {dateAfter(today, 60)} (Section 19(1): within 30 days of the deadline or the reply).
+            </li>
+          </ul>
+        </div>
+      </div>
+
       <p className="text-[13px] text-slate-500">
-        You file this application yourself on the official RTI portal (rtionline.gov.in or your
-        state portal). RTI Copilot never submits applications or stores your portal credentials.
+        Read the draft before you file it: RTI Copilot is an assistant, not legal advice. You file
+        the application yourself, online on the Delhi Government&apos;s RTI portal or by post to
+        the PIO. RTI Copilot never submits applications or stores your portal credentials.
       </p>
     </div>
   );

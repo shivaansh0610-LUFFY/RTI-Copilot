@@ -6,7 +6,8 @@ from app.schemas.base import ApiModel
 
 
 class CaseCreate(ApiModel):
-    grievance_text: str = Field(min_length=10)
+    # 5,000 characters is far more than any grievance needs, and bounds what reaches the model.
+    grievance_text: str = Field(min_length=10, max_length=5000)
 
 
 class CaseCreated(ApiModel):

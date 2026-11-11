@@ -95,6 +95,17 @@ def split_paragraphs(page_text: str) -> list[str]:
     return [paragraph for paragraph in _merge(pieces) if any(char.isalpha() for char in paragraph)]
 
 
+def split_clauses(page_text: str) -> list[str]:
+    """Like split_paragraphs but with no merging: one piece per clause or numbered point.
+
+    For a PIO's reply, where each numbered answer must be citable on its own; corpus passages
+    are merged instead because a lone clause is too little for the embedding model."""
+    pieces = []
+    for unit in _units(_strip_unstorable(page_text)):
+        pieces.extend(_split_oversized(unit))
+    return [piece for piece in pieces if any(char.isalpha() for char in piece)]
+
+
 def _strip_unstorable(text: str) -> str:
     # psycopg cannot encode lone surrogates, which turn up in some PDFs.
     return CONTROL_CHARS.sub(" ", text).encode("utf-8", "ignore").decode("utf-8")

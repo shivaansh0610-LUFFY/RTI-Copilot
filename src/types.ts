@@ -9,6 +9,14 @@ export interface InformationRequest {
   context?: string; // why this is being asked, e.g. what an earlier reply left out
   publiclyAvailable?: boolean;
   publicSource?: PublicSource; // where the information was found, when publiclyAvailable
+  basis?: Citation; // the official passage showing this record should exist
+}
+
+export interface Citation {
+  sourceTitle: string;
+  url: string;
+  page: number; // page of the PDF file
+  quote: string;
 }
 
 export interface PublicSource {
@@ -29,6 +37,8 @@ export interface ClarifyResult {
   questions: ClarifyQuestion[];
 }
 
+export type DraftLanguage = "en" | "hi";
+
 export interface DraftResult {
   draftText: string;
   charCount: number;
@@ -42,6 +52,30 @@ export interface DraftResult {
 export interface FollowUpContext {
   originalAuthority: string;
   requests: InformationRequest[];
+}
+
+// Hand-off from the RTI Drafting Wizard to the Response Analysis Wizard: the case whose
+// requests were just drafted. caseId is undefined when the app runs without a backend.
+export interface FiledCase {
+  caseId?: string;
+  requests: InformationRequest[];
+  // Set when the drafting wizard hands it over, for the "My RTIs" list.
+  grievance?: string;
+  draftText?: string;
+}
+
+export interface ResponseAnalysis {
+  pages: number;
+  ocrUsed: boolean;
+  passages: ResponsePassage[];
+  results: ClassificationResult[];
+}
+
+export interface AppealItem {
+  requestId: string;
+  title: string;
+  label: ClassificationLabel;
+  explanation: string;
 }
 
 export interface ResponsePassage {

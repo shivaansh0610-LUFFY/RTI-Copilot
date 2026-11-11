@@ -82,11 +82,13 @@ export const LABEL_TEXT: Record<ClassificationLabel, string> = {
 };
 
 // Outcomes where the information was not actually provided, so the citizen is
-// offered a follow-up RTI for them (pre-selected on the summary step).
+// offered a first appeal or a follow-up RTI for them (pre-selected on the summary step).
+// A refusal under an exemption is a classic ground for a first appeal.
 export const FOLLOW_UP_LABELS: ClassificationLabel[] = [
   "PARTIALLY_RESPONSIVE",
   "NON_RESPONSIVE",
   "NO_RECORD_STATED",
+  "EXEMPTION_CLAIMED",
   "INSUFFICIENT_EVIDENCE",
 ];
 

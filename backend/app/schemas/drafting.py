@@ -1,3 +1,7 @@
+from typing import Annotated, Literal
+
+from pydantic import Field
+
 from app.schemas.base import ApiModel
 from app.schemas.requests import InformationRequest
 
@@ -17,11 +21,20 @@ class ClarifyResult(ApiModel):
 
 
 class DecomposeBody(ApiModel):
-    clarification: dict[str, str] = {}
+    clarification: Annotated[dict[str, Annotated[str, Field(max_length=300)]], Field(max_length=10)] = {}
+
+
+MAX_REQUESTS = 20
 
 
 class RequestsBody(ApiModel):
-    requests: list[InformationRequest]
+    requests: list[InformationRequest] = Field(max_length=MAX_REQUESTS)
+
+
+class DraftBody(ApiModel):
+    # An application with nothing in it is not a draft.
+    requests: list[InformationRequest] = Field(min_length=1, max_length=MAX_REQUESTS)
+    language: Literal["en", "hi"] = "en"
 
 
 class DraftResponse(ApiModel):

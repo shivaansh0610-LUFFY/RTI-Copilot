@@ -17,6 +17,39 @@ class FakeResponse:
         return self._json_data
 
 
+@pytest.fixture(autouse=True)
+def no_throttle(monkeypatch):
+    """The one-request-a-second throttle would make each test wait; its own test turns it on."""
+    monkeypatch.setattr(geocoding, "MIN_INTERVAL_SECONDS", 0.0)
+
+
+def test_reverse_geocode_keeps_a_second_between_calls(monkeypatch):
+    monkeypatch.setattr(geocoding, "MIN_INTERVAL_SECONDS", 1.0)
+    monkeypatch.setattr(geocoding, "_last_call", 0.0)
+    clock = {"now": 100.0}
+    slept = []
+    monkeypatch.setattr(geocoding.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(geocoding.time, "sleep", lambda seconds: (slept.append(seconds), clock.update(now=clock["now"] + seconds)))
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: FakeResponse(DELHI_RESPONSE))
+
+    geocoding.reverse_geocode(28.6, 77.2)
+    clock["now"] += 0.25
+    geocoding.reverse_geocode(28.6, 77.2)
+
+    assert slept == [pytest.approx(0.75)]
+
+
+def test_reverse_geocode_raises_on_an_unreadable_answer(monkeypatch):
+    class NotJson(FakeResponse):
+        def json(self):
+            raise ValueError("Expecting value")
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: NotJson({}))
+
+    with pytest.raises(geocoding.GeocodingError, match="unreadable"):
+        geocoding.reverse_geocode(28.6, 77.2)
+
+
 DELHI_RESPONSE = {
     "display_name": "123, MG Road, Connaught Place, New Delhi, Delhi, 110001, India",
     "address": {

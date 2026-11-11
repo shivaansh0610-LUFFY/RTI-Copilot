@@ -19,9 +19,16 @@ DEFAULT_MODEL = "openai/gpt-oss-120b"
 _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 
+# Every call runs inside a citizen's request, and every caller falls back to a safe default on
+# failure, so a slow call should fail fast rather than hold the page (the SDK default is 60 s
+# with 2 retries).
+TIMEOUT_SECONDS = 45.0
+MAX_RETRIES = 1
+
+
 @lru_cache
 def _client() -> Groq:
-    return Groq(api_key=get_settings().llm_api_key)
+    return Groq(api_key=get_settings().llm_api_key, timeout=TIMEOUT_SECONDS, max_retries=MAX_RETRIES)
 
 
 def complete_json(system: str, user: str, *, max_tokens: int = 2000) -> list | dict:
