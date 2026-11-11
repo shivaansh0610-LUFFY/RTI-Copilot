@@ -1,4 +1,6 @@
+from app.config import get_settings
 from app.schemas import InformationRequest
+from app.services import grounding
 from app.services.drafting import real
 
 
@@ -123,6 +125,58 @@ SAMPLE_REQUEST = InformationRequest(
     period="Last 1 year",
     quality="good",
 )
+
+
+MB_PASSAGE = grounding.CorpusPassage(
+    id="S-1",
+    text="All measurements of work done shall be recorded in the Measurement Book. " * 8,
+    page=112,
+    source_title="CPWD Works Manual 2024",
+    url="https://cpwd.gov.in/WriteReadData/man_cir/65002.pdf",
+)
+
+
+def test_decompose_cites_only_passages_it_was_given(monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_corpus_citations", True)
+    monkeypatch.setattr(real.grounding, "relevant_passages", lambda grievance: [MB_PASSAGE])
+    seen = {}
+
+    def fake(system, user, **kwargs):
+        seen.update(system=system, user=user)
+        return [
+            {"category": "Measurement Book", "title": "Copy of the MB entries", "quality": "good", "basis": "S-1"},
+            {"category": "Work order", "title": "Copy of the work order", "quality": "good", "basis": "S-7"},
+            {"category": "x" * 200, "title": "Amount spent", "quality": "good", "basis": None},
+        ]
+
+    monkeypatch.setattr(real.llm, "complete_json", fake)
+
+    requests = real.decompose_grievance("Pothole on Ring Road", {"period": "Last 1 year"})
+
+    assert "[S-1] (CPWD Works Manual 2024, PDF page 112)" in seen["user"]
+    assert '"basis"' in seen["system"]
+    assert requests[0].basis.source_title == "CPWD Works Manual 2024"
+    assert requests[0].basis.page == 112
+    assert requests[0].basis.quote.endswith("…") and len(requests[0].basis.quote) <= 282
+    assert requests[1].basis is None  # S-7 was never offered
+    assert len(requests[2].category) == 80
+
+
+def test_decompose_works_without_the_corpus(monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_corpus_citations", True)
+
+    def no_database(grievance):
+        raise RuntimeError("passages table missing")
+
+    monkeypatch.setattr(real.grounding, "relevant_passages", no_database)
+    monkeypatch.setattr(
+        real.llm, "complete_json", lambda *a, **k: [{"category": "Work order", "title": "Copy of the work order"}]
+    )
+
+    requests = real.decompose_grievance("Pothole", {})
+
+    assert [request.title for request in requests] == ["Copy of the work order"]
+    assert requests[0].basis is None
 
 
 SECOND_REQUEST = SAMPLE_REQUEST.model_copy(

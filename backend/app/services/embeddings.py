@@ -5,6 +5,7 @@ than encoding; later calls reuse the loaded model. Vectors are L2-normalised, so
 similarity is a plain dot product and matches the `<=>` cosine distance used in retrieval.
 """
 
+import logging
 from functools import lru_cache
 
 MODEL_NAME = "BAAI/bge-large-en-v1.5"
@@ -23,6 +24,15 @@ def _load_model():
     from sentence_transformers import SentenceTransformer
 
     return SentenceTransformer(MODEL_NAME)
+
+
+def warm_up() -> None:
+    """Load the model now (in a background thread at API startup), so the first citizen's
+    request does not wait for it. A failure is only logged: requests then go without citations."""
+    try:
+        embed_query("warm up")
+    except Exception:
+        logging.getLogger(__name__).warning("Could not load the embedding model", exc_info=True)
 
 
 def embed_texts(texts: list[str], batch_size: int = BATCH_SIZE) -> list[list[float]]:

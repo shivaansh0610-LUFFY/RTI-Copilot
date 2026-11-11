@@ -22,6 +22,7 @@ def deterministic_settings(monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "use_llm_drafting", False)
     monkeypatch.setattr(settings, "use_public_info_lookup", False)
+    monkeypatch.setattr(settings, "use_corpus_citations", False)
 
 
 @pytest.fixture

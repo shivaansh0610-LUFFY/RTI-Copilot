@@ -1,4 +1,4 @@
-import { Check, X } from "lucide-react";
+import { BookOpen, Check, ExternalLink, X } from "lucide-react";
 import type { InformationRequest } from "../../types";
 import type { StepId } from "./constants";
 
@@ -154,6 +154,29 @@ export function RequestCard({
         <p className="mt-2 border-l-2 border-orange-200 pl-2 text-xs text-slate-600">
           {request.context}
         </p>
+      )}
+      {request.basis && (
+        <div className="mt-2 rounded-md bg-slate-50 p-2 text-xs text-slate-600">
+          <p className="flex items-center gap-1 font-medium text-slate-700">
+            <BookOpen size={12} />
+            Why ask for this
+          </p>
+          <p className="mt-1 italic">&ldquo;{request.basis.quote}&rdquo;</p>
+          <a
+            href={
+              // A browser's PDF viewer opens at the page given after #page=.
+              /\.pdf$/i.test(request.basis.url)
+                ? `${request.basis.url}#page=${request.basis.page}`
+                : request.basis.url
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-blue-700 underline"
+          >
+            {request.basis.sourceTitle}, PDF page {request.basis.page}
+            <ExternalLink size={11} />
+          </a>
+        </div>
       )}
       {children}
     </div>

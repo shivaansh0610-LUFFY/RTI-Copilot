@@ -6,8 +6,9 @@ breaks the endpoint for the citizen filing a request.
 import logging
 import re
 
-from app.schemas import ClarifyQuestion, ClarifyResult, InformationRequest
-from app.services import llm, public_info
+from app.config import get_settings
+from app.schemas import Citation, ClarifyQuestion, ClarifyResult, InformationRequest
+from app.services import grounding, llm, public_info
 from app.services.drafting import mock
 from app.services.drafting.mock import DEFAULT_AUTHORITY
 
@@ -85,6 +86,38 @@ def generate_clarify_result(grievance: str) -> ClarifyResult:
         return mock.generate_clarify_result(grievance)
 
 
+GROUNDING_INSTRUCTIONS = """
+
+You are also given numbered passages from the official corpus (the RTI Act and the CPWD \
+Works Manuals). Add a "basis" field to each item: the id of the one passage (e.g. "S-2") \
+which shows that this kind of record is kept or required, for example a rule that \
+measurements are recorded in a Measurement Book, so the citizen can show the PIO the record \
+should exist. Where a passage names a specific record, ask for that record by name. Use null \
+when no passage shows this; never cite a passage that is merely on the same topic."""
+
+MAX_REQUESTS = 6
+MAX_CATEGORY_CHARS = 80  # the width of requests.category
+
+
+def _corpus_passages(grievance: str) -> list[grounding.CorpusPassage]:
+    """The passages to offer as citations, or none (citations off, or the corpus unavailable)."""
+    if not get_settings().use_corpus_citations:
+        return []
+    try:
+        return grounding.relevant_passages(grievance)
+    except Exception:
+        logger.warning("Corpus search failed; decomposing without citations", exc_info=True)
+        return []
+
+
+def _citation(passage: grounding.CorpusPassage | None) -> Citation | None:
+    if passage is None:
+        return None
+    return Citation(
+        source_title=passage.source_title, url=passage.url, page=passage.page, quote=grounding.quote(passage.text)
+    )
+
+
 def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[InformationRequest]:
     period = clarification.get("period", "Last 1 year")
     if clarification:
@@ -93,22 +126,32 @@ def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[I
     else:
         user_prompt = f"Grievance: {grievance}\nPeriod of interest: {period}"
 
+    passages = _corpus_passages(grievance)
+    system = DECOMPOSE_SYSTEM_PROMPT
+    if passages:
+        system += GROUNDING_INSTRUCTIONS
+        listed = "\n".join(f"[{p.id}] ({p.source_title}, PDF page {p.page}) {p.text}" for p in passages)
+        user_prompt += f"\n\nOfficial passages:\n{listed}"
+    by_id = {passage.id: passage for passage in passages}
+
     try:
-        items = llm.complete_json(DECOMPOSE_SYSTEM_PROMPT, user_prompt)
+        items = llm.complete_json(system, user_prompt, max_tokens=6000)
         if not isinstance(items, list) or not items:
             raise ValueError(f"Expected a non-empty JSON array, got: {items!r}")
 
         return [
             InformationRequest(
                 id=f"RQ-{index:03d}",
-                category=str(item["category"]),
+                category=str(item["category"])[:MAX_CATEGORY_CHARS],
                 title=str(item["title"]),
                 authority=DEFAULT_AUTHORITY,
                 period=period,
                 quality=item.get("quality") if item.get("quality") in ("good", "needs-detail") else "good",
                 source="generated",
+                # Only a passage that was actually offered; an id the model made up cites nothing.
+                basis=_citation(by_id.get(str(item.get("basis")))),
             )
-            for index, item in enumerate(items, start=1)
+            for index, item in enumerate(items[:MAX_REQUESTS], start=1)
         ]
     except Exception:
         logger.warning("LLM decomposition failed, falling back to mock", exc_info=True)
@@ -129,7 +172,9 @@ top, as "Location concerned: <place> (<coordinates>)", and refer to it in the it
 - Then exactly {count} numbered items ("1.", "2.", ...), one per information request \
 given to you, in the same order. Each item asks for a specific existing record (a \
 certified copy, a figure, a date, a report) for the stated period. Keep each request's \
-meaning; make it precise, never vaguer. Never ask "why".
+meaning; make it precise, never vaguer. Never ask "why". If a request says which \
+document the record is kept under, you may say so, naming that document exactly as given \
+(no paragraph numbers).
 - Close by asking that, if any information is held by another public authority, the \
 application be transferred under Section 6(3) of the Act.
 
@@ -150,6 +195,7 @@ def generate_draft(grievance: str, requests: list[InformationRequest], language:
     listed = "\n".join(
         f"{index}. [{request.category}] {request.title} (period: {request.period})"
         + (f" (background: {request.context})" if request.context else "")
+        + (f" (record kept under: {request.basis.source_title})" if request.basis else "")
         for index, request in enumerate(requests, start=1)
     )
     system = DRAFT_SYSTEM_PROMPT.format(count=len(requests), language=LANGUAGES.get(language, LANGUAGES["en"]))

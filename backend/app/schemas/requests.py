@@ -10,6 +10,15 @@ class PublicSource(ApiModel):
     url: str
 
 
+class Citation(ApiModel):
+    """The official passage that shows why a record should exist. Not stored with the case."""
+
+    source_title: str
+    url: str
+    page: int  # page of the PDF file
+    quote: str
+
+
 class InformationRequest(ApiModel):
     id: str  # e.g. "RQ-001"
     category: str  # e.g. "Work order"
@@ -21,3 +30,4 @@ class InformationRequest(ApiModel):
     context: str | None = None  # why this is being asked, e.g. what an earlier reply left out
     publicly_available: bool | None = None
     public_source: PublicSource | None = None  # where it was found, when publicly_available
+    basis: Citation | None = None  # the corpus passage this request rests on, if any

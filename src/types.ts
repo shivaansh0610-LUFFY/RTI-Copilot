@@ -9,6 +9,14 @@ export interface InformationRequest {
   context?: string; // why this is being asked, e.g. what an earlier reply left out
   publiclyAvailable?: boolean;
   publicSource?: PublicSource; // where the information was found, when publiclyAvailable
+  basis?: Citation; // the official passage showing this record should exist
+}
+
+export interface Citation {
+  sourceTitle: string;
+  url: string;
+  page: number; // page of the PDF file
+  quote: string;
 }
 
 export interface PublicSource {
