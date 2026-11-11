@@ -1,4 +1,5 @@
-import { AlertTriangle, Check, Copy, FilePlus2, FileUp, Loader2, Scale } from "lucide-react";
+import { AlertTriangle, Check, Copy, FilePlus2, FileUp, Loader2, Printer, Scale } from "lucide-react";
+import { printText } from "../../print";
 import { useState } from "react";
 import type {
   AppealItem,
@@ -369,10 +370,19 @@ export function SummaryStep({
             <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-slate-900">Your first appeal</p>
-                <SecondaryButton onClick={copyAppeal}>
-                  {appealCopied ? <Check size={14} /> : <Copy size={14} />}
-                  {appealCopied ? "Copied" : "Copy"}
-                </SecondaryButton>
+                <div className="flex gap-2">
+                  <SecondaryButton onClick={copyAppeal}>
+                    {appealCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {appealCopied ? "Copied" : "Copy"}
+                  </SecondaryButton>
+                  <SecondaryButton
+                    onClick={() => printText("First appeal", appealText)}
+                    aria-label="Print or save as PDF"
+                  >
+                    <Printer size={14} />
+                    PDF
+                  </SecondaryButton>
+                </div>
               </div>
               <pre className="whitespace-pre-wrap font-mono text-xs text-slate-800">{appealText}</pre>
               <p className="text-xs text-slate-500">

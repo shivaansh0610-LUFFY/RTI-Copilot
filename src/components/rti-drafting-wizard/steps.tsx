@@ -7,8 +7,10 @@ import {
   Loader2,
   MapPin,
   Plus,
+  Printer,
 } from "lucide-react";
 import { useState } from "react";
+import { printText } from "../../print";
 import type { ClarifyQuestion, DraftLanguage, DraftResult, InformationRequest } from "../../types";
 import type { IssueLocation } from "./location";
 import { PhotoLocation } from "./PhotoLocation";
@@ -360,10 +362,20 @@ export function DraftStep({
           ))}
           {isUpdating && <Loader2 size={14} className="ml-1 animate-spin self-center text-slate-500" />}
         </div>
-        <SecondaryButton onClick={copyDraft} disabled={isUpdating}>
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? "Copied" : "Copy draft"}
-        </SecondaryButton>
+        <div className="flex gap-2">
+          <SecondaryButton onClick={copyDraft} disabled={isUpdating}>
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? "Copied" : "Copy draft"}
+          </SecondaryButton>
+          <SecondaryButton
+            onClick={() => printText("RTI application", draft.draftText)}
+            disabled={isUpdating}
+            aria-label="Print or save as PDF"
+          >
+            <Printer size={14} />
+            PDF
+          </SecondaryButton>
+        </div>
       </div>
 
       <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
