@@ -13,6 +13,7 @@ from app.services import embeddings
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    embeddings.use_cpu()  # see app.services.embeddings: MPS crashes from worker threads
     if settings.use_corpus_citations and settings.use_llm_drafting:
         # Loading the embedding model takes a while; do it now, off the request path.
         threading.Thread(target=embeddings.warm_up, name="embedding-warm-up", daemon=True).start()

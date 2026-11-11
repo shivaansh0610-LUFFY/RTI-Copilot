@@ -52,7 +52,7 @@ act on directly. Each request must ask for a concrete, existing record (a docume
 order, report, or figure) — RTI compels disclosure of records, not explanations, so \
 never phrase a request as "why" something happened. Use the clarifying answers to make \
 requests more specific (e.g. naming the location or asset they identify), not just the \
-period.
+period. Name the place by its street or landmark; never put map coordinates in a title.
 
 Respond with ONLY a JSON array, no prose, no markdown fences. Each item:
 {"category": "<short label, e.g. Work order>", "title": "<the record being requested>", \
@@ -180,7 +180,8 @@ placeholders for those.
 Write it like this:
 - Open with one sentence requesting information under Section 6(1) of the RTI Act, 2005.
 - If the grievance has a line starting "Location:", state the location once, near the \
-top, as "Location concerned: <place> (<coordinates>)", and refer to it in the items.
+top, as "Location concerned: <place> (<coordinates>)". In the items, refer to it by \
+place name only ("the above location", the street); never repeat the coordinates.
 - Then exactly {count} numbered items ("1.", "2.", ...), one per information request \
 given to you, in the same order. Each item asks for a specific existing record (a \
 certified copy, a figure, a date, a report) for the stated period. Keep each request's \
@@ -196,7 +197,15 @@ the grievance or the requests. Plain text only, no markdown. At most 2,500 chara
 
 Respond with ONLY one JSON object, no prose, no markdown fences: {{"draft": "<the text>"}}"""
 
-LANGUAGES = {"en": "Write in English.", "hi": "Write in Hindi (Devanagari script)."}
+LANGUAGES = {
+    "en": "Write in English.",
+    "hi": (
+        "Write every part in Hindi (Devanagari script), including the opening, the location label "
+        '(write "संबंधित स्थान:" instead of "Location concerned:") and the closing. Keep only '
+        "proper names and record names such as Measurement Book in English, in brackets after "
+        "the Hindi term."
+    ),
+}
 NUMBERED_ITEM = re.compile(r"^\s*(\d+)[.)]\s", re.MULTILINE)
 
 

@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_engine
 from app.models import Document, Passage, Source
-from app.services import retrieval
+from app.services import embeddings, retrieval
 
 # The grievance says what went wrong; these ask what records exist about road works.
 RECORD_QUERIES = [
@@ -52,9 +52,10 @@ def relevant_passages(grievance: str, *, session: Session | None = None) -> list
 
 def _relevant(session: Session, grievance: str) -> list[CorpusPassage]:
     queries = [grievance[:1000], *RECORD_QUERIES]
+    vectors = embeddings.embed_queries(queries)  # one batch: six separate calls took ~10 s on a CPU
     rankings = [
-        [passage.id for passage in retrieval.search_passages(query, PER_QUERY, session=session)]
-        for query in queries
+        [passage.id for passage in retrieval.search_passages(query, PER_QUERY, session=session, embedding=vector)]
+        for query, vector in zip(queries, vectors, strict=True)
     ]
     best = retrieval.reciprocal_rank_fusion(rankings)[:MAX_PASSAGES]
     rows = session.execute(

@@ -35,21 +35,24 @@ WORD = re.compile(r"[^\W_]+")
 ENGLISH = literal_column("'english'::regconfig")  # the configuration the `tsv` column is built with
 
 
-def search_passages(query: str, k: int = 5, *, session: Session | None = None) -> list[Passage]:
+def search_passages(
+    query: str, k: int = 5, *, session: Session | None = None, embedding: list[float] | None = None
+) -> list[Passage]:
     """The `k` passages that best match `query`, best first.
 
     Opens its own database session unless one is passed in. The returned passages are fully
-    loaded, so they stay usable after that session closes.
+    loaded, so they stay usable after that session closes. `embedding` is the query's vector
+    when the caller already has it (from embeddings.embed_queries, for several queries at once).
     """
     if k < 1 or not query.strip():
         return []
     if session is not None:
-        return _search(session, query, k)
+        return _search(session, query, k, embedding)
     with Session(get_engine(), expire_on_commit=False) as own_session:
-        return _search(own_session, query, k)
+        return _search(own_session, query, k, embedding)
 
 
-def _search(session: Session, query: str, k: int) -> list[Passage]:
+def _search(session: Session, query: str, k: int, embedding: list[float] | None = None) -> list[Passage]:
     limit = max(CANDIDATES, k)
     rankings = []
     # Keyword hits go first so that they win ties. A keyword search only returns passages that
@@ -59,7 +62,7 @@ def _search(session: Session, query: str, k: int) -> list[Passage]:
     tsquery = build_tsquery(query)
     if tsquery:
         rankings.append(_keyword_ranking(session, tsquery, limit))
-    rankings.append(_vector_ranking(session, embeddings.embed_query(query), limit))
+    rankings.append(_vector_ranking(session, embedding or embeddings.embed_query(query), limit))
 
     best = reciprocal_rank_fusion(rankings)[:k]
     passages = {passage.id: passage for passage in session.scalars(select(Passage).where(Passage.id.in_(best)))}
