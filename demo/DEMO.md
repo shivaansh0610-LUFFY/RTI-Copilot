@@ -16,7 +16,9 @@ for the right ones and are not fobbed off.
 
 ## The flow (about 5 minutes)
 
-1. **Describe.** Paste:
+0. **Home page.** The pitch, the problem tiles (only things PWD is responsible for on its
+   roads), and the three steps. Click **Pothole or broken road**.
+1. **Describe.** Replace the starter sentence with:
    > There is a big pothole on Ring Road near Lajpat Nagar metro station. It has been there
    > for about 6 months, two-wheelers fall almost every week, and nobody from PWD has repaired
    > it despite complaints.
@@ -30,8 +32,8 @@ for the right ones and are not fobbed off.
    link that opens the PDF at that page. *This is the GenAI core: retrieval over 4,789
    passages of official documents, cited, never invented.*
 4. **Draft.** One application, ready for the portal's text box: Section 6(1), the location,
-   numbered requests, a Section 6(3) transfer clause. Switch to **हिंदी**. Copy. Note the
-   dates: the reply is due in 30 days, and the first-appeal window.
+   numbered requests, a Section 6(3) transfer clause. Switch to **हिंदी**. Copy, or **PDF**
+   (print or save as PDF). Note the dates: the reply is due in 30 days, then the appeal window.
 5. **Got the reply? Analyse it.** Upload `demo/sample-pio-reply.pdf` (a made-up reply,
    labelled as a sample). Each request gets a finding with the line of the reply it is based
    on: answered via an annexure, "not maintained", a fee demanded, an exemption claimed under
@@ -39,6 +41,9 @@ for the right ones and are not fobbed off.
    than guessing.
 6. **Draft first appeal.** Select the unanswered requests and draft the Section 19(1)
    appeal. Registration number and dates stay as [placeholders]: the app never guesses them.
+7. **My RTIs.** The application is listed there. Enter today as the filing date: it shows
+   "Reply due by ... (30 days left)", and after that the appeal window. It is kept in this
+   browser only; nothing is sent anywhere.
 
 ## If something goes wrong
 
@@ -49,5 +54,6 @@ for the right ones and are not fobbed off.
 
 ## Next steps to mention
 
-A home page with common problems, "My RTIs" with deadline reminders, reading scanned
-replies, other authorities (MCD, NDMC, DJB) chosen from the map pin, and deployment.
+Reminders by SMS or email when a deadline nears, reading scanned replies, other authorities
+(MCD, NDMC, DJB) chosen from the map pin, accounts so the list follows you across devices,
+and deployment.

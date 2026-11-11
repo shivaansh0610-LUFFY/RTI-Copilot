@@ -76,12 +76,16 @@ The whole RTI loop runs end to end, for road grievances against PWD Delhi:
    with the line of the reply it rests on, or "insufficient evidence" when it is unclear.
 6. **First appeal**: a Section 19(1) appeal drafted from those findings.
 
+Around it: a home page with the problems PWD handles, **My RTIs** (every draft kept in the
+browser, with the reply due date and the appeal window once the filing date is entered), and
+print / save as PDF for the draft and the appeal. Inputs are size-limited on the API.
+
 The AI runs on Groq (`USE_LLM_DRAFTING`); without it every step falls back to templates and
 says so, never to invented content. `demo/DEMO.md` is a five-minute demo script, and
 `demo/sample-pio-reply.pdf` a made-up reply to try the analysis with.
 
-Next: a home page with common problems, a "My RTIs" list with deadline reminders, reading
-scanned replies, other authorities (MCD, NDMC, DJB) and deployment.
+Next: deadline reminders by SMS or email, reading scanned replies, other authorities (MCD,
+NDMC, DJB), accounts, and deployment.
 
 ## Running locally
 
