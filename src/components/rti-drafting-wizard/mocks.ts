@@ -1,4 +1,4 @@
-import type { ClarifyResult, DraftResult, InformationRequest } from "../../types";
+import type { ClarifyResult, DraftLanguage, DraftResult, InformationRequest } from "../../types";
 import { PERIOD_OPTIONS } from "./constants";
 
 // Backend calls — each is a single async function. The ones still mocked are a
@@ -28,8 +28,8 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
   return address;
 }
 
-// POST /cases. The returned caseId threads through getClarifyQuestions, decomposeGrievance,
-// checkPublicInfo and generateDraft below, since their real endpoints are case-scoped.
+// POST /cases. The returned caseId threads through getClarifyQuestions, decomposeGrievance
+// and generateDraft below, since their real endpoints are case-scoped.
 export async function createCase(grievance: string): Promise<string | undefined> {
   if (!API_URL) return undefined;
   const { caseId } = await postJson<{ caseId: string }>("/cases", { grievanceText: grievance });
@@ -116,36 +116,14 @@ export async function createCustomRequest(
   };
 }
 
-// POST /cases/:id/public-info-check
-export async function checkPublicInfo(
-  requests: InformationRequest[],
-  caseId?: string,
-): Promise<InformationRequest[]> {
-  if (API_URL && caseId) {
-    return postJson<InformationRequest[]>(`/cases/${caseId}/public-info-check`, { requests });
-  }
-
-  return requests.map((request) =>
-    request.id === "RQ-001"
-      ? {
-          ...request,
-          publiclyAvailable: true,
-          publicSource: {
-            title: "Central Public Procurement Portal — awarded tenders & work orders",
-            url: "https://eprocure.gov.in/cppp/",
-          },
-        }
-      : { ...request, publiclyAvailable: false, publicSource: undefined },
-  );
-}
-
-// POST /cases/:id/draft
+// POST /cases/:id/draft. The built-in mock ignores `language` and writes English.
 export async function generateDraft(
   requests: InformationRequest[],
   caseId?: string,
+  language: DraftLanguage = "en",
 ): Promise<DraftResult> {
   if (API_URL && caseId) {
-    return postJson<DraftResult>(`/cases/${caseId}/draft`, { requests });
+    return postJson<DraftResult>(`/cases/${caseId}/draft`, { requests, language });
   }
 
   const draftText = requests

@@ -1,10 +1,15 @@
 import { CornerDownRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { ClarifyQuestion, DraftResult, FollowUpContext, InformationRequest } from "../../types";
+import type {
+  ClarifyQuestion,
+  DraftLanguage,
+  DraftResult,
+  FollowUpContext,
+  InformationRequest,
+} from "../../types";
 import { ALL_STEPS, CASE_STATUS, type StepId } from "./constants";
 import { locationLine, withLocationLine, type IssueLocation } from "./location";
 import {
-  checkPublicInfo,
   createCase,
   createCustomRequest,
   decomposeGrievance,
@@ -15,7 +20,6 @@ import {
   ClarifyStep,
   DescribeStep,
   DraftStep,
-  PublicCheckStep,
   QualityReviewStep,
   RequestsStep,
 } from "./steps";
@@ -47,6 +51,8 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
   const [requestsError, setRequestsError] = useState("");
   const [carriedRequests, setCarriedRequests] = useState<InformationRequest[]>([]);
   const [draft, setDraft] = useState<DraftResult | undefined>();
+  const [draftError, setDraftError] = useState("");
+  const [language, setLanguage] = useState<DraftLanguage>("en");
   const [caseId, setCaseId] = useState<string | undefined>();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -58,7 +64,7 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
 
   const visibleSteps = useMemo(
     () =>
-      step === "describe" || step === "clarify" || step === "requests" || step === "public-check"
+      step === "describe" || step === "clarify" || step === "requests"
         ? ALL_STEPS
         : ALL_STEPS.filter((s) => s.id !== "quality-review" || needsQualityReview),
     [step, needsQualityReview],
@@ -139,43 +145,39 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
     setRequests((prev) => prev.filter((r) => r.id !== id));
   }
 
+  // Every server call ends in .finally, so a failed one can never leave the spinner (and the
+  // disabled Back and Continue buttons) on for good.
+  function requestDraft(toDraft: InformationRequest[], draftLanguage: DraftLanguage) {
+    setDraftError("");
+    setIsLoading(true);
+    generateDraft(toDraft, caseId, draftLanguage)
+      .then((result) => {
+        setDraft(result);
+        setLanguage(draftLanguage);
+        setStep("draft");
+      })
+      .catch(() => {
+        setDraftError("We couldn't create the draft. Please try again.");
+      })
+      .finally(() => setIsLoading(false));
+  }
+
   function handleRequestsContinue() {
     if (requests.length === 0) {
       setRequestsError("Add at least one request to continue.");
       return;
     }
     setRequestsError("");
-    setIsLoading(true);
-    checkPublicInfo(requests, caseId).then((result) => {
-      setRequests(result);
-      setIsLoading(false);
-      setStep("public-check");
-    });
-  }
-
-  function handlePublicCheckContinue() {
-    const nonPublic = requests.filter((r) => !r.publiclyAvailable);
-    setCarriedRequests(nonPublic);
-    const stillNeedsDetail = nonPublic.some((r) => r.quality === "needs-detail");
-    if (stillNeedsDetail) {
+    setCarriedRequests(requests);
+    if (requests.some((r) => r.quality === "needs-detail")) {
       setStep("quality-review");
     } else {
-      setIsLoading(true);
-      generateDraft(nonPublic, caseId).then((result) => {
-        setDraft(result);
-        setIsLoading(false);
-        setStep("draft");
-      });
+      requestDraft(requests, language);
     }
   }
 
   function handleQualityReviewContinue() {
-    setIsLoading(true);
-    generateDraft(carriedRequests, caseId).then((result) => {
-      setDraft(result);
-      setIsLoading(false);
-      setStep("draft");
-    });
+    requestDraft(carriedRequests, language);
   }
 
   function updateCarriedRequestTitle(id: string, title: string) {
@@ -183,11 +185,11 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
   }
 
   function goBack() {
+    setDraftError("");
     if (step === "clarify") setStep("describe");
     else if (step === "requests") setStep("clarify");
-    else if (step === "public-check") setStep("requests");
-    else if (step === "quality-review") setStep("public-check");
-    else if (step === "draft") setStep(needsQualityReview ? "quality-review" : "public-check");
+    else if (step === "quality-review") setStep("requests");
+    else if (step === "draft") setStep(needsQualityReview ? "quality-review" : "requests");
   }
 
   return (
@@ -247,8 +249,6 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
             />
           )}
 
-          {step === "public-check" && <PublicCheckStep requests={requests} />}
-
           {step === "quality-review" && (
             <QualityReviewStep
               requests={carriedRequests}
@@ -256,7 +256,17 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
             />
           )}
 
-          {step === "draft" && draft && <DraftStep draft={draft} requests={carriedRequests} />}
+          {step === "draft" && draft && (
+            <DraftStep
+              draft={draft}
+              requests={carriedRequests}
+              language={language}
+              onLanguageChange={(next) => requestDraft(carriedRequests, next)}
+              isUpdating={isLoading}
+            />
+          )}
+
+          {draftError && <p className="mt-3 text-[13px] text-red-600">{draftError}</p>}
         </div>
 
         <div className="flex items-center justify-between border-t border-slate-200 p-4">
@@ -278,12 +288,6 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
           )}
           {step === "requests" && (
             <PrimaryButton onClick={handleRequestsContinue} disabled={isLoading}>
-              {isLoading && <Loader2 size={14} className="animate-spin" />}
-              Continue
-            </PrimaryButton>
-          )}
-          {step === "public-check" && (
-            <PrimaryButton onClick={handlePublicCheckContinue} disabled={isLoading}>
               {isLoading && <Loader2 size={14} className="animate-spin" />}
               Continue
             </PrimaryButton>

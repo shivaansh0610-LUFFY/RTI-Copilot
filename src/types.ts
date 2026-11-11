@@ -29,6 +29,8 @@ export interface ClarifyResult {
   questions: ClarifyQuestion[];
 }
 
+export type DraftLanguage = "en" | "hi";
+
 export interface DraftResult {
   draftText: string;
   charCount: number;
