@@ -59,6 +59,9 @@ export interface FollowUpContext {
 export interface FiledCase {
   caseId?: string;
   requests: InformationRequest[];
+  // Set when the drafting wizard hands it over, for the "My RTIs" list.
+  grievance?: string;
+  draftText?: string;
 }
 
 export interface ResponseAnalysis {

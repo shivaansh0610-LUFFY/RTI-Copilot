@@ -168,7 +168,7 @@ export default function RtiDraftingWizard({
         setDraft(result);
         setLanguage(draftLanguage);
         setStep("draft");
-        onDraftReady?.({ caseId, requests: toDraft });
+        onDraftReady?.({ caseId, requests: toDraft, grievance, draftText: result.draftText });
       })
       .catch(() => {
         setDraftError("We couldn't create the draft. Please try again.");
