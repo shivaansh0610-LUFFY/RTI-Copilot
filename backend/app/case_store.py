@@ -22,6 +22,7 @@ from app.schemas import InformationRequest, PublicSource
 GRIEVANCE_CAPTURED = "GRIEVANCE_CAPTURED"
 REQUESTS_GENERATED = "REQUESTS_GENERATED"
 DRAFT_READY = "DRAFT_READY"
+RESPONSE_ANALYSED = "RESPONSE_ANALYSED"
 
 # requests.public_status for each value of InformationRequest.publicly_available.
 # None in both places means the public-availability check has not run.
