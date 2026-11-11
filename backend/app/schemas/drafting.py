@@ -1,3 +1,7 @@
+from typing import Literal
+
+from pydantic import Field
+
 from app.schemas.base import ApiModel
 from app.schemas.requests import InformationRequest
 
@@ -22,6 +26,12 @@ class DecomposeBody(ApiModel):
 
 class RequestsBody(ApiModel):
     requests: list[InformationRequest]
+
+
+class DraftBody(ApiModel):
+    # An application with nothing in it is not a draft.
+    requests: list[InformationRequest] = Field(min_length=1)
+    language: Literal["en", "hi"] = "en"
 
 
 class DraftResponse(ApiModel):

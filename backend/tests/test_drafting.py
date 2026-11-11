@@ -73,6 +73,31 @@ def test_draft_returns_text_covering_each_request(client, case_id):
     assert body["flaggedRequestIds"] == ["RQ-002"]
 
 
+def test_draft_rejects_an_empty_application(client, case_id):
+    response = client.post(f"/cases/{case_id}/draft", json={"requests": []})
+    assert response.status_code == 422
+
+
+def test_draft_uses_the_model_when_llm_drafting_is_on(client, case_id, monkeypatch):
+    from app.config import get_settings
+    from app.services.drafting import real
+
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    seen = {}
+
+    def fake_generate_draft(grievance, requests, language):
+        seen.update(grievance=grievance, language=language)
+        return "1. " + requests[0].title
+
+    monkeypatch.setattr(real, "generate_draft", fake_generate_draft)
+    requests = decompose(client, case_id)[:1]
+    response = client.post(f"/cases/{case_id}/draft", json={"requests": requests, "language": "hi"})
+
+    assert response.status_code == 200
+    assert response.json()["draftText"] == "1. " + requests[0]["title"]
+    assert seen == {"grievance": "The road outside my house has been broken for two years.", "language": "hi"}
+
+
 def test_draft_flags_vague_titles(client, case_id):
     response = client.post(
         f"/cases/{case_id}/draft",

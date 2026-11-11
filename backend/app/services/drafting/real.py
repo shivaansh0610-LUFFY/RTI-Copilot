@@ -4,6 +4,7 @@ breaks the endpoint for the citizen filing a request.
 """
 
 import logging
+import re
 
 from app.schemas import ClarifyQuestion, ClarifyResult, InformationRequest
 from app.services import llm, public_info
@@ -114,9 +115,67 @@ def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[I
         return mock.decompose_grievance(grievance, clarification)
 
 
+DRAFT_SYSTEM_PROMPT = """You write the text of a Right to Information (RTI) application \
+under the RTI Act, 2005 to the Public Information Officer (PIO) of the Public Works \
+Department (PWD), Government of NCT of Delhi, for a citizen with a road-infrastructure \
+grievance. The citizen pastes your text into the "text of application" box of an online \
+RTI portal, which also collects their name, address and fee separately, so never add \
+placeholders for those.
+
+Write it like this:
+- Open with one sentence requesting information under Section 6(1) of the RTI Act, 2005.
+- If the grievance has a line starting "Location:", state the location once, near the \
+top, as "Location concerned: <place> (<coordinates>)", and refer to it in the items.
+- Then exactly {count} numbered items ("1.", "2.", ...), one per information request \
+given to you, in the same order. Each item asks for a specific existing record (a \
+certified copy, a figure, a date, a report) for the stated period. Keep each request's \
+meaning; make it precise, never vaguer. Never ask "why".
+- Close by asking that, if any information is held by another public authority, the \
+application be transferred under Section 6(3) of the Act.
+
+Never invent facts: no names, dates, amounts, file or work-order numbers that are not in \
+the grievance or the requests. Plain text only, no markdown. At most 2,500 characters. \
+{language}
+
+Respond with ONLY one JSON object, no prose, no markdown fences: {{"draft": "<the text>"}}"""
+
+LANGUAGES = {"en": "Write in English.", "hi": "Write in Hindi (Devanagari script)."}
+NUMBERED_ITEM = re.compile(r"^\s*(\d+)[.)]\s", re.MULTILINE)
+
+
+def generate_draft(grievance: str, requests: list[InformationRequest], language: str = "en") -> str:
+    """The application text, written by the model. Falls back to the template on any failure,
+    and also when the model did not give exactly one numbered item per request (it merged,
+    dropped or invented one), since the citizen would be filing something they did not ask for."""
+    listed = "\n".join(
+        f"{index}. [{request.category}] {request.title} (period: {request.period})"
+        + (f" (background: {request.context})" if request.context else "")
+        for index, request in enumerate(requests, start=1)
+    )
+    system = DRAFT_SYSTEM_PROMPT.format(count=len(requests), language=LANGUAGES.get(language, LANGUAGES["en"]))
+    try:
+        payload = llm.complete_json(
+            system, f"Grievance:\n{grievance}\n\nInformation requests:\n{listed}", max_tokens=6000
+        )
+        draft = payload.get("draft") if isinstance(payload, dict) else None
+        if not isinstance(draft, str) or not draft.strip():
+            raise ValueError(f"Expected {{'draft': <text>}}, got: {payload!r}")
+        numbers = [int(number) for number in NUMBERED_ITEM.findall(draft)]
+        if numbers != list(range(1, len(requests) + 1)):
+            raise ValueError(f"Expected items 1..{len(requests)}, got {numbers}")
+        return draft.strip()
+    except Exception:
+        logger.warning("LLM draft generation failed, falling back to the template", exc_info=True)
+        return mock.generate_draft(requests)
+
+
 def check_public_info(requests: list[InformationRequest]) -> list[InformationRequest]:
     try:
         return public_info.check_public_info(requests)
     except Exception:
-        logger.warning("Public-info lookup failed, falling back to mock", exc_info=True)
-        return mock.check_public_info(requests)
+        # Not the mock: it marks RQ-001 public with a made-up citation, and a false "already
+        # public" sends the citizen away with nothing. A failed lookup means "not checked".
+        logger.warning("Public-info lookup failed; marking every request as not checked", exc_info=True)
+        return [
+            request.model_copy(update={"publicly_available": None, "public_source": None}) for request in requests
+        ]

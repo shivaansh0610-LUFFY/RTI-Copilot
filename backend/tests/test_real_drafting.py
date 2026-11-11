@@ -125,13 +125,55 @@ SAMPLE_REQUEST = InformationRequest(
 )
 
 
+SECOND_REQUEST = SAMPLE_REQUEST.model_copy(
+    update={"id": "RQ-002", "category": "Expenditure", "title": "Amount spent on repairing the road"}
+)
+GRIEVANCE = "Pothole for 6 months.\n\nLocation: Ring Road, Lajpat Nagar (28.56700, 77.24300)"
+
+
+def test_generate_draft_returns_the_model_text(monkeypatch):
+    seen = {}
+
+    def fake(system, user, **kwargs):
+        seen.update(system=system, user=user)
+        return {"draft": "Under Section 6(1)...\n\n1. Copy of the work order\n2. Amount spent\n\nTransfer under 6(3)."}
+
+    monkeypatch.setattr(real.llm, "complete_json", fake)
+
+    draft = real.generate_draft(GRIEVANCE, [SAMPLE_REQUEST, SECOND_REQUEST], "hi")
+
+    assert draft.startswith("Under Section 6(1)")
+    # The grievance (with its location line) and every request reach the model, in order.
+    assert "Location: Ring Road, Lajpat Nagar" in seen["user"]
+    assert seen["user"].index(SAMPLE_REQUEST.title) < seen["user"].index(SECOND_REQUEST.title)
+    assert "exactly 2 numbered items" in seen["system"]
+    assert "Hindi" in seen["system"]
+
+
+def test_generate_draft_falls_back_when_a_request_is_merged_or_dropped(monkeypatch):
+    monkeypatch.setattr(real.llm, "complete_json", lambda *a, **k: {"draft": "Intro\n1. Both records together"})
+
+    draft = real.generate_draft(GRIEVANCE, [SAMPLE_REQUEST, SECOND_REQUEST])
+
+    assert draft == real.mock.generate_draft([SAMPLE_REQUEST, SECOND_REQUEST])
+
+
+def test_generate_draft_falls_back_on_failure(monkeypatch):
+    def raise_timeout(*args, **kwargs):
+        raise TimeoutError("Groq did not answer")
+
+    monkeypatch.setattr(real.llm, "complete_json", raise_timeout)
+
+    assert real.generate_draft(GRIEVANCE, [SAMPLE_REQUEST]) == real.mock.generate_draft([SAMPLE_REQUEST])
+
+
 def test_check_public_info_uses_the_real_lookup(monkeypatch):
     monkeypatch.setattr(real.public_info, "check_public_info", lambda requests: ["looked up"])
 
     assert real.check_public_info([SAMPLE_REQUEST]) == ["looked up"]
 
 
-def test_check_public_info_falls_back_to_mock_on_failure(monkeypatch):
+def test_check_public_info_marks_requests_unchecked_on_failure(monkeypatch):
     def raise_no_database(*args, **kwargs):
         raise RuntimeError("DATABASE_URL is not set")
 
@@ -139,5 +181,7 @@ def test_check_public_info_falls_back_to_mock_on_failure(monkeypatch):
 
     requests = real.check_public_info([SAMPLE_REQUEST])
 
-    # Falls back to the deterministic mock rather than letting the endpoint 500.
-    assert requests == real.mock.check_public_info([SAMPLE_REQUEST])
+    # No 500, and no invented citation: the mock would mark RQ-001 public with a made-up source.
+    assert [request.publicly_available for request in requests] == [None]
+    assert [request.public_source for request in requests] == [None]
+    assert requests[0].title == SAMPLE_REQUEST.title

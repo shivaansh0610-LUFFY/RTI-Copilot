@@ -5,7 +5,7 @@ from app import case_store
 from app.config import get_settings
 from app.models import Case
 from app.routers.cases import CaseDep, SessionDep
-from app.schemas import ClarifyResult, DecomposeBody, DraftResponse, InformationRequest, RequestsBody
+from app.schemas import ClarifyResult, DecomposeBody, DraftBody, DraftResponse, InformationRequest, RequestsBody
 from app.services.drafting import mock, real
 from app.services.drafting.specificity import is_vague
 
@@ -64,8 +64,11 @@ def public_info_check(case: CaseDep, session: SessionDep, body: RequestsBody) ->
 
 
 @router.post("/draft", response_model=DraftResponse, response_model_exclude_none=True)
-def draft(case: CaseDep, session: SessionDep, body: RequestsBody) -> DraftResponse:
-    draft_text = mock.generate_draft(body.requests)
+def draft(case: CaseDep, session: SessionDep, body: DraftBody) -> DraftResponse:
+    if get_settings().use_llm_drafting:
+        draft_text = real.generate_draft(case.grievance_text, body.requests, body.language)
+    else:
+        draft_text = mock.generate_draft(body.requests)
     # The draft is built from these requests (the citizen may have edited them since the check),
     # so these are the ones to keep, in the same transaction as the case becoming DRAFT_READY.
     case_store.update_case(case, session=session, status=case_store.DRAFT_READY, commit=False)
