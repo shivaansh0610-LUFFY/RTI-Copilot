@@ -5,6 +5,7 @@ breaks the endpoint for the citizen filing a request.
 
 import logging
 import re
+from datetime import date
 
 from app.config import get_settings
 from app.schemas import Citation, ClarifyQuestion, ClarifyResult, InformationRequest
@@ -118,6 +119,16 @@ def _citation(passage: grounding.CorpusPassage | None) -> Citation | None:
     )
 
 
+def todays_date_line() -> str:
+    """The model does not know today's date and, asked for "the last 6 months", made up dates
+    two years in the past. Every prompt that may mention dates gets this line."""
+    today = date.today()
+    return (
+        f"Today's date is {today.day} {today:%B %Y}. Count any exact dates back from today; "
+        "if unsure, keep the period in words."
+    )
+
+
 def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[InformationRequest]:
     period = clarification.get("period", "Last 1 year")
     if clarification:
@@ -125,6 +136,7 @@ def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[I
         user_prompt = f"Grievance: {grievance}\nClarifying answers:\n{answers}"
     else:
         user_prompt = f"Grievance: {grievance}\nPeriod of interest: {period}"
+    user_prompt += f"\n\n{todays_date_line()}"
 
     passages = _corpus_passages(grievance)
     system = DECOMPOSE_SYSTEM_PROMPT
@@ -201,7 +213,9 @@ def generate_draft(grievance: str, requests: list[InformationRequest], language:
     system = DRAFT_SYSTEM_PROMPT.format(count=len(requests), language=LANGUAGES.get(language, LANGUAGES["en"]))
     try:
         payload = llm.complete_json(
-            system, f"Grievance:\n{grievance}\n\nInformation requests:\n{listed}", max_tokens=6000
+            system,
+            f"Grievance:\n{grievance}\n\nInformation requests:\n{listed}\n\n{todays_date_line()}",
+            max_tokens=6000,
         )
         draft = payload.get("draft") if isinstance(payload, dict) else None
         if not isinstance(draft, str) or not draft.strip():

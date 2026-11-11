@@ -66,8 +66,9 @@ def generate_appeal(grievance: str, items: list[AppealItem], language: str = "en
         appeal = payload.get("appeal") if isinstance(payload, dict) else None
         if not isinstance(appeal, str) or not appeal.strip():
             raise ValueError(f"Expected {{'appeal': <text>}}, got: {payload!r}")
+        # The grounds come first; a second numbered list after them (the relief sought) is fine.
         numbers = [int(number) for number in NUMBERED_ITEM.findall(appeal)]
-        if numbers != list(range(1, len(items) + 1)):
+        if numbers[: len(items)] != list(range(1, len(items) + 1)):
             raise ValueError(f"Expected grounds 1..{len(items)}, got {numbers}")
         return appeal.strip()
     except Exception:

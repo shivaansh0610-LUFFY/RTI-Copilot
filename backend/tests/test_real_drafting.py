@@ -248,3 +248,36 @@ def test_quotes_lose_the_page_headers_of_the_cpwd_pdfs():
     )
     assert grounding.quote(raw) == "Annexure - V Proforma For Quality Control Inspection"
     assert grounding.clean("197 197 ANNEXURE TO SOPs 20.1.12A. The work") == "20.1.12A. The work"
+
+
+def test_decompose_and_draft_tell_the_model_todays_date(monkeypatch):
+    from datetime import date
+
+    prompts = []
+
+    def fake(system, user, **kwargs):
+        prompts.append(user)
+        return [{"category": "Work order", "title": "Copy of the work order"}] if len(prompts) == 1 else {"draft": "1. x"}
+
+    monkeypatch.setattr(real.llm, "complete_json", fake)
+
+    real.decompose_grievance("Pothole for 6 months", {"period": "About 6 months"})
+    real.generate_draft("Pothole for 6 months", [SAMPLE_REQUEST])
+
+    today = date.today()
+    assert all(f"Today's date is {today.day} {today:%B %Y}" in prompt for prompt in prompts)
+
+
+def test_appeal_accepts_a_relief_list_after_the_grounds(monkeypatch):
+    from app.schemas.responses import AppealItem
+    from app.services import appeal
+
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    items = [
+        AppealItem(request_id="RQ-1", title="A", label="NON_RESPONSIVE", explanation="x"),
+        AppealItem(request_id="RQ-2", title="B", label="EXEMPTION_CLAIMED", explanation="y"),
+    ]
+    text = "To, ...\n1. Ground A\n2. Ground B\nRelief:\n1. Direct the PIO\n2. Free of cost"
+    monkeypatch.setattr(appeal.llm, "complete_json", lambda *a, **k: {"appeal": text})
+
+    assert appeal.generate_appeal("Pothole", items) == text

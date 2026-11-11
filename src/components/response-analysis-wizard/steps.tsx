@@ -310,8 +310,8 @@ export function SummaryStep({
               answered
             </p>
             <p className="mt-0.5 text-[13px] text-slate-600">
-              Select the ones you still want, and we'll start a follow-up RTI with them and the
-              context from this reply.
+              Select the ones you still want. You can draft a first appeal against this reply, or
+              start a follow-up RTI with them and the context from this reply.
             </p>
           </div>
           <div className="flex flex-col gap-2">
