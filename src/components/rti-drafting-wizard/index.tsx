@@ -1,5 +1,5 @@
 import { ArrowRight, CornerDownRight, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   ClarifyQuestion,
   DraftLanguage,
@@ -8,7 +8,7 @@ import type {
   FollowUpContext,
   InformationRequest,
 } from "../../types";
-import { ALL_STEPS, CASE_STATUS, type StepId } from "./constants";
+import { ALL_STEPS, type StepId } from "./constants";
 import { locationLine, withLocationLine, type IssueLocation } from "./location";
 import {
   createCase,
@@ -24,7 +24,15 @@ import {
   QualityReviewStep,
   RequestsStep,
 } from "./steps";
-import { PrimaryButton, SecondaryButton, StepProgressBar } from "./ui";
+import {
+  PageContainer,
+  PageHeader,
+  StepCard,
+  StepCardActions,
+  StepCardBody,
+  StepProgress,
+} from "../layout/Layout";
+import { PrimaryButton, SecondaryButton } from "./ui";
 
 // A follow-up starts at the Requests step: the grievance and clarification are
 // already known from the original application.
@@ -82,6 +90,14 @@ export default function RtiDraftingWizard({
         : ALL_STEPS.filter((s) => s.id !== "quality-review" || needsQualityReview),
     [step, needsQualityReview],
   );
+
+  const stepNumber = visibleSteps.findIndex((s) => s.id === step) + 1;
+
+  // A new step starts at its top; on a phone the Continue button is far down the previous one.
+  useEffect(() => {
+    window.scrollTo?.({ top: 0 });
+  }, [step]);
+  const stepLabel = ALL_STEPS.find((s) => s.id === step)?.label ?? "";
 
   function handleLocationChange(location: IssueLocation | undefined) {
     setIssueLocation(location);
@@ -207,15 +223,14 @@ export default function RtiDraftingWizard({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">RTI Drafting Assistant</h1>
-        <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
-          {CASE_STATUS[step]}
-        </span>
-      </div>
+    <PageContainer>
+      <PageHeader
+        eyebrow={`Step ${stepNumber} of ${visibleSteps.length} · ${stepLabel}`}
+        title={followUp ? "Draft your follow-up RTI" : "Draft your RTI application"}
+        intro="Turn your complaint into an application that asks for the exact records PWD must keep."
+      />
 
-      <StepProgressBar steps={visibleSteps} currentStepId={step} />
+      <StepProgress steps={visibleSteps} currentId={step} />
 
       {followUp && (
         <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 p-3">
@@ -228,8 +243,8 @@ export default function RtiDraftingWizard({
         </div>
       )}
 
-      <div className="flex min-h-[360px] flex-col rounded-md border border-slate-200">
-        <div className="flex-1 p-6">
+      <StepCard>
+        <StepCardBody>
           {step === "describe" && (
             <DescribeStep
               grievance={grievance}
@@ -281,9 +296,9 @@ export default function RtiDraftingWizard({
           )}
 
           {draftError && <p className="mt-3 text-[13px] text-red-600">{draftError}</p>}
-        </div>
+        </StepCardBody>
 
-        <div className="flex items-center justify-between border-t border-slate-200 p-4">
+        <StepCardActions>
           <SecondaryButton onClick={goBack} disabled={step === "describe" || isLoading}>
             Back
           </SecondaryButton>
@@ -321,8 +336,8 @@ export default function RtiDraftingWizard({
             ) : (
               <PrimaryButton disabled>Done</PrimaryButton>
             ))}
-        </div>
-      </div>
-    </div>
+        </StepCardActions>
+      </StepCard>
+    </PageContainer>
   );
 }

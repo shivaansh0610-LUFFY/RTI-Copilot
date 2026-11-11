@@ -2,19 +2,12 @@ import type { ClassificationLabel, InformationRequest } from "../../types";
 
 export type StepId = "upload" | "align" | "classify" | "summary";
 
-export function getCaseStatus(
-  step: StepId,
-  isProcessing: boolean,
-  processingFailed: boolean,
-): string {
-  if (step === "upload") {
-    if (processingFailed) return "PROCESSING_FAILED";
-    if (isProcessing) return "PROCESSING";
-    return "RESPONSE_UPLOADED";
-  }
-  if (step === "align" || step === "classify") return "ANALYSIS_READY";
-  return "COMPLETED";
-}
+export const ANALYSIS_STEPS: { id: StepId; label: string }[] = [
+  { id: "upload", label: "Upload" },
+  { id: "align", label: "Matching" },
+  { id: "classify", label: "Findings" },
+  { id: "summary", label: "Next steps" },
+];
 
 // The requests originally filed in the RTI application (source of truth from
 // Part A). Standalone default data so this component works without props.

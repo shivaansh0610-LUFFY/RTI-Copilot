@@ -378,9 +378,15 @@ export function DraftStep({
         </div>
       </div>
 
-      <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-4">
-        <FileText size={18} className="shrink-0 text-slate-500" />
-        <pre className="whitespace-pre-wrap font-mono text-xs text-slate-800">{draft.draftText}</pre>
+      {/* Shown like the page it becomes: a readable font, not code. */}
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 sm:p-4">
+        <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+          <FileText size={14} />
+          Your application
+        </div>
+        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-800">
+          {draft.draftText}
+        </pre>
       </div>
       <p className="text-right text-xs text-slate-400">
         {draft.charCount.toLocaleString()} / 3,000 characters

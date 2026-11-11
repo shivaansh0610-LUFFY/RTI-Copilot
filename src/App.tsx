@@ -1,13 +1,11 @@
-import { Scale } from "lucide-react";
 import { useState } from "react";
 import HomePage from "./components/home/HomePage";
+import { SiteFooter, SiteHeader, type View } from "./components/layout/Layout";
 import MyRtis from "./components/tracker/MyRtis";
 import { loadRtis, saveRtis, titleFrom, upsertRti, type TrackedRti } from "./components/tracker/tracking";
 import RtiDraftingWizard from "./components/rti-drafting-wizard";
 import ResponseAnalysisWizard from "./components/response-analysis-wizard";
 import type { FiledCase, FollowUpContext } from "./types";
-
-type View = "home" | "drafting" | "analysis" | "rtis";
 
 function App() {
   const [view, setView] = useState<View>("home");
@@ -73,32 +71,15 @@ function App() {
     setView("analysis");
   }
 
-  const tab = (active: boolean) =>
-    "rounded-md px-3 py-1.5 text-sm font-medium " + (active ? "bg-slate-900 text-white" : "text-slate-600");
+  function navigate(target: View) {
+    if (target === "drafting") openDrafting();
+    else setView(target);
+    window.scrollTo?.({ top: 0 });
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <nav className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
-        <button
-          type="button"
-          onClick={() => setView("home")}
-          className="flex items-center gap-2 text-sm font-semibold text-slate-900"
-        >
-          <Scale size={16} />
-          RTI Copilot
-        </button>
-        <div className="flex flex-wrap gap-1">
-          <button type="button" onClick={openDrafting} className={tab(view === "drafting")}>
-            1. Draft your RTI
-          </button>
-          <button type="button" onClick={() => setView("analysis")} className={tab(view === "analysis")}>
-            2. Analyse the reply
-          </button>
-          <button type="button" onClick={() => setView("rtis")} className={tab(view === "rtis")}>
-            My RTIs{rtis.length > 0 ? ` (${rtis.length})` : ""}
-          </button>
-        </div>
-      </nav>
+    <div className="flex min-h-screen flex-col bg-slate-50">
+      <SiteHeader view={view} rtiCount={rtis.length} onNavigate={navigate} />
 
       {view === "home" && <HomePage onStart={handleStart} onAnalyse={() => setView("analysis")} />}
 
@@ -129,6 +110,8 @@ function App() {
           onFileFollowUp={(context) => restartDrafting(context)}
         />
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

@@ -27,7 +27,7 @@ export default function HomePage({
   onAnalyse: () => void;
 }) {
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-8 p-6">
+    <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 sm:px-6">
       <section className="flex flex-col gap-3 pt-4">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
           Right to Information Act, 2005 · PWD Delhi
@@ -99,11 +99,6 @@ export default function HomePage({
         </ol>
       </section>
 
-      <p className="border-t border-slate-200 pt-4 text-xs text-slate-500">
-        RTI Copilot is an assistant, not legal advice: read every draft before you file it. It
-        never files on your behalf or asks for portal passwords. Your photo stays on your device;
-        your description is sent to the AI service that writes the drafts.
-      </p>
-    </div>
+    </main>
   );
 }
