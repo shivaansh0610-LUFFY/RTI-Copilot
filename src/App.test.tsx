@@ -32,7 +32,7 @@ test("'I got a reply' opens the reply analysis", () => {
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: /i got a reply/i }));
 
-  expect(screen.getByText("Response Analysis").closest("[hidden]")).toBeNull();
+  expect(screen.getByRole("heading", { name: "Analyse the reply" }).closest("[hidden]")).toBeNull();
 });
 
 test("a drafted application appears in My RTIs, and filing it shows the reply deadline", async () => {

@@ -1,5 +1,5 @@
 import { Info } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   AppealItem,
   ClassificationResult,
@@ -7,7 +7,7 @@ import type {
   FollowUpContext,
   ResponsePassage,
 } from "../../types";
-import { getCaseStatus, MOCK_ORIGINAL_REQUESTS, type StepId } from "./constants";
+import { ANALYSIS_STEPS, MOCK_ORIGINAL_REQUESTS, type StepId } from "./constants";
 import {
   alignRequests,
   analyseResponse,
@@ -17,7 +17,15 @@ import {
   ingestResponse,
 } from "./mocks";
 import { AlignStep, ClassifyStep, SummaryStep, UploadStep } from "./steps";
-import { PrimaryButton, SecondaryButton, StepProgressBar } from "./ui";
+import {
+  PageContainer,
+  PageHeader,
+  StepCard,
+  StepCardActions,
+  StepCardBody,
+  StepProgress,
+} from "../layout/Layout";
+import { PrimaryButton, SecondaryButton } from "./ui";
 
 // With a drafted case and a backend, the uploaded reply is read and judged for real against
 // that case's requests. Otherwise the wizard shows its fixed sample data, and says so.
@@ -33,6 +41,12 @@ export default function ResponseAnalysisWizard({
   const requests = isReal && filedCase ? filedCase.requests : MOCK_ORIGINAL_REQUESTS;
 
   const [step, setStep] = useState<StepId>("upload");
+  const stepIndex = ANALYSIS_STEPS.findIndex((s) => s.id === step);
+
+  // A new step starts at its top; on a phone the Continue button is far down the previous one.
+  useEffect(() => {
+    window.scrollTo?.({ top: 0 });
+  }, [step]);
 
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -116,20 +130,18 @@ export default function ResponseAnalysisWizard({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">Response Analysis</h1>
-        <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
-          {getCaseStatus(step, isProcessing, Boolean(processingError))}
-        </span>
-      </div>
+    <PageContainer>
+      <PageHeader
+        eyebrow={`Step ${stepIndex + 1} of ${ANALYSIS_STEPS.length} · ${ANALYSIS_STEPS[stepIndex].label}`}
+        title="Analyse the reply"
+        intro={
+          isReal
+            ? `Upload the reply you received. Each of your ${requests.length} request${requests.length === 1 ? " is" : "s are"} checked against it.`
+            : "Upload the PIO's reply to see what was answered, dodged or refused, with the line of the reply each finding rests on."
+        }
+      />
 
-      {isReal ? (
-        <p className="text-[13px] text-slate-600">
-          Upload the reply you received to your application. Each of your {requests.length}{" "}
-          request{requests.length === 1 ? "" : "s"} is checked against it.
-        </p>
-      ) : (
+      {!isReal && (
         <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-white p-3">
           <Info size={16} className="mt-0.5 shrink-0 text-slate-500" />
           <p className="text-[13px] text-slate-600">
@@ -139,10 +151,10 @@ export default function ResponseAnalysisWizard({
         </div>
       )}
 
-      <StepProgressBar currentStepId={step} />
+      <StepProgress steps={ANALYSIS_STEPS} currentId={step} />
 
-      <div className="flex min-h-[360px] flex-col rounded-md border border-slate-200">
-        <div className="flex-1 p-6">
+      <StepCard>
+        <StepCardBody>
           {step === "upload" && (
             <UploadStep
               file={file}
@@ -168,9 +180,9 @@ export default function ResponseAnalysisWizard({
               }
             />
           )}
-        </div>
+        </StepCardBody>
 
-        <div className="flex items-center justify-between border-t border-slate-200 p-4">
+        <StepCardActions>
           <SecondaryButton onClick={goBack} disabled={step === "upload"}>
             Back
           </SecondaryButton>
@@ -185,8 +197,8 @@ export default function ResponseAnalysisWizard({
             <PrimaryButton onClick={() => setStep("summary")}>Continue</PrimaryButton>
           )}
           {step === "summary" && <PrimaryButton disabled>Done</PrimaryButton>}
-        </div>
-      </div>
-    </div>
+        </StepCardActions>
+      </StepCard>
+    </PageContainer>
   );
 }

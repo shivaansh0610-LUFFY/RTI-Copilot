@@ -1,5 +1,6 @@
 import { CalendarClock, Check, Copy, FileSearch, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { PageContainer, PageHeader } from "../layout/Layout";
 import { deadlineStatus, formatDate, type TrackedRti } from "./tracking";
 
 export default function MyRtis({
@@ -16,17 +17,15 @@ export default function MyRtis({
   onStart: () => void;
 }) {
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">My RTIs</h1>
-        <p className="text-[13px] text-slate-500">
-          Saved in this browser only. After you file, add the date and registration number to see
-          when the reply is due and until when you can appeal.
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        eyebrow="Saved in this browser only"
+        title="My RTIs"
+        intro="After you file, add the date and registration number to see when the reply is due and until when you can appeal."
+      />
 
       {rtis.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-slate-300 p-6">
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-slate-300 bg-white p-6">
           <p className="text-sm text-slate-600">No applications yet. Each one you draft appears here.</p>
           <button
             type="button"
@@ -47,7 +46,7 @@ export default function MyRtis({
           />
         ))
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -77,7 +76,7 @@ function RtiCard({
   }
 
   return (
-    <article className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4">
+    <article className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="text-sm font-medium text-slate-900">{rti.title}</h2>
