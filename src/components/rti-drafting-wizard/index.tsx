@@ -1,9 +1,10 @@
-import { CornerDownRight, Loader2 } from "lucide-react";
+import { ArrowRight, CornerDownRight, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type {
   ClarifyQuestion,
   DraftLanguage,
   DraftResult,
+  FiledCase,
   FollowUpContext,
   InformationRequest,
 } from "../../types";
@@ -27,7 +28,16 @@ import { PrimaryButton, SecondaryButton, StepProgressBar } from "./ui";
 
 // A follow-up starts at the Requests step: the grievance and clarification are
 // already known from the original application.
-export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpContext }) {
+export default function RtiDraftingWizard({
+  followUp,
+  onDraftReady,
+  onAnalyseReply,
+}: {
+  followUp?: FollowUpContext;
+  // Told the case and requests each time a draft is made, for the reply analysis later.
+  onDraftReady?: (filed: FiledCase) => void;
+  onAnalyseReply?: () => void;
+}) {
   const [step, setStep] = useState<StepId>(followUp ? "requests" : "describe");
 
   const [grievance, setGrievance] = useState(
@@ -155,6 +165,7 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
         setDraft(result);
         setLanguage(draftLanguage);
         setStep("draft");
+        onDraftReady?.({ caseId, requests: toDraft });
       })
       .catch(() => {
         setDraftError("We couldn't create the draft. Please try again.");
@@ -298,7 +309,15 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
               Continue
             </PrimaryButton>
           )}
-          {step === "draft" && <PrimaryButton disabled>Done</PrimaryButton>}
+          {step === "draft" &&
+            (onAnalyseReply ? (
+              <PrimaryButton onClick={onAnalyseReply} disabled={isLoading}>
+                Got the reply? Analyse it
+                <ArrowRight size={14} />
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton disabled>Done</PrimaryButton>
+            ))}
         </div>
       </div>
     </div>

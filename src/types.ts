@@ -46,6 +46,27 @@ export interface FollowUpContext {
   requests: InformationRequest[];
 }
 
+// Hand-off from the RTI Drafting Wizard to the Response Analysis Wizard: the case whose
+// requests were just drafted. caseId is undefined when the app runs without a backend.
+export interface FiledCase {
+  caseId?: string;
+  requests: InformationRequest[];
+}
+
+export interface ResponseAnalysis {
+  pages: number;
+  ocrUsed: boolean;
+  passages: ResponsePassage[];
+  results: ClassificationResult[];
+}
+
+export interface AppealItem {
+  requestId: string;
+  title: string;
+  label: ClassificationLabel;
+  explanation: string;
+}
+
 export interface ResponsePassage {
   id: string;
   page: number;
