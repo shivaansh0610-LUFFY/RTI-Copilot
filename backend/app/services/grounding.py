@@ -10,6 +10,7 @@ questions about record-keeping, merges the hits by reciprocal rank fusion (the s
 app.services.retrieval) and returns the best few with the source each came from.
 """
 
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -65,13 +66,31 @@ def _relevant(session: Session, grievance: str) -> list[CorpusPassage]:
     by_id = {row.id: row for row in rows}
     found = [by_id[passage_id] for passage_id in best if passage_id in by_id]
     return [
-        CorpusPassage(id=f"S-{number}", text=row.text, page=row.page, source_title=row.title, url=row.url)
+        CorpusPassage(id=f"S-{number}", text=clean(row.text), page=row.page, source_title=row.title, url=row.url)
         for number, row in enumerate(found, start=1)
     ]
 
 
+# Running headers and footers that pypdf leaves inside the CPWD passages.
+PAGE_CHROME = re.compile(
+    r"\b\d{2,3} Years of (?:Engineering Excellence|CPWD'?s dedicated service to the Nation)\b"
+    r"|\bSECTION \d+ CPWD WORKS MANUAL \d{4}\b"
+    r"|\bCPWD WORKS MANUAL \d{4}\b"
+    r"|\bANNEXURE TO SOPs\s?"
+)
+# Plain numbers only: a clause number such as "1." or "20.1.12A." has a dot, so it stays.
+LEADING_PAGE_NUMBERS = re.compile(r"^(?:\d{1,4}\s+)+")
+
+
+def clean(text: str) -> str:
+    """The passage without page headers, footers and stray page numbers at its start."""
+    text = " ".join(PAGE_CHROME.sub(" ", text).split())
+    return LEADING_PAGE_NUMBERS.sub("", text)
+
+
 def quote(text: str) -> str:
-    """The start of a passage, cut at a word boundary, for showing next to a request."""
+    """The start of a passage, cleaned and cut at a word boundary, for showing next to a request."""
+    text = clean(text)
     if len(text) <= QUOTE_CHARS:
         return text
     cut = text.rfind(" ", 0, QUOTE_CHARS)

@@ -239,3 +239,12 @@ def test_check_public_info_marks_requests_unchecked_on_failure(monkeypatch):
     assert [request.publicly_available for request in requests] == [None]
     assert [request.public_source for request in requests] == [None]
     assert requests[0].title == SAMPLE_REQUEST.title
+
+
+def test_quotes_lose_the_page_headers_of_the_cpwd_pdfs():
+    raw = (
+        "SECTION 53 CPWD WORKS MANUAL 2014 160 Years of Engineering Excellence 324 "
+        "Annexure - V Proforma For Quality Control Inspection"
+    )
+    assert grounding.quote(raw) == "Annexure - V Proforma For Quality Control Inspection"
+    assert grounding.clean("197 197 ANNEXURE TO SOPs 20.1.12A. The work") == "20.1.12A. The work"
