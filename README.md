@@ -60,10 +60,28 @@ AI copilot for RTI request drafting and filing assistance.
 - Identified follow-up items for Month 2: fee/payment guidance, appeal
   workflow, and response tracking.
 
-## Status
+## What it does now
 
-🚧 Early-stage / Month 1 of OJT — architecture and core drafting flow in
-progress. This README will be updated as further milestones are completed.
+The whole RTI loop runs end to end, for road grievances against PWD Delhi:
+
+1. **Describe** the problem, optionally with a photo and a pin on the map.
+2. **Clarify**: the AI asks only what the description leaves out.
+3. **Requests**: the grievance becomes specific record requests. Each one can cite the
+   passage of the CPWD Works Manual or the RTI Act that shows the record should exist
+   (retrieval over the official corpus; a citation is only ever a passage that was found).
+4. **Draft**: one application for the portal's text box, in English or Hindi, with the
+   reply deadline and the first-appeal window.
+5. **Analyse the reply**: upload the PIO's reply (PDF with text, or .txt). Each request gets
+   a finding (answered, partly answered, no record, exemption, transfer, fee demanded...)
+   with the line of the reply it rests on, or "insufficient evidence" when it is unclear.
+6. **First appeal**: a Section 19(1) appeal drafted from those findings.
+
+The AI runs on Groq (`USE_LLM_DRAFTING`); without it every step falls back to templates and
+says so, never to invented content. `demo/DEMO.md` is a five-minute demo script, and
+`demo/sample-pio-reply.pdf` a made-up reply to try the analysis with.
+
+Next: a home page with common problems, a "My RTIs" list with deadline reminders, reading
+scanned replies, other authorities (MCD, NDMC, DJB) and deployment.
 
 ## Running locally
 
@@ -122,6 +140,10 @@ alembic upgrade head                       # create the tables
 python -m ingest.register_sources --db     # download data/sources.csv, verify checksums, fill `sources`
 python -m ingest.load_documents            # extract, split, embed and store the passages
 ```
+
+With the corpus loaded, `USE_CORPUS_CITATIONS=true` (and `USE_LLM_DRAFTING=true`) makes the
+generated requests cite it. The API then loads the embedding model at startup, in the
+background, which needs a few GB of memory.
 
 `load_documents` is safe to rerun (sources that already have a document are
 skipped; `--force` re-ingests them). The first run downloads the embedding
