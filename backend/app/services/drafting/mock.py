@@ -85,11 +85,14 @@ def check_public_info(requests: list[InformationRequest]) -> list[InformationReq
 
 
 def generate_draft(requests: list[InformationRequest]) -> str:
+    # Subject names the broad category, not the specific record, so it doesn't just repeat
+    # "Particulars of information sought" verbatim -- the convention most PIOs expect
+    # (e.g. https://blog.ipleaders.in/drafting-an-rti-application/).
     sections = []
     for request in requests:
         background = f"Background: {request.context}\n" if request.context else ""
         sections.append(
-            f'Subject: Request for information regarding "{request.title}"\n'
+            f"Subject: Application under the Right to Information Act, 2005 — {request.category}\n"
             f"Authority: {request.authority}\n"
             f"Particulars of information sought: {request.title}\n"
             f"Period: {request.period}\n"

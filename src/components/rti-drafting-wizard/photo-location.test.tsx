@@ -3,12 +3,16 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import RtiDraftingWizard from "./index";
-import { createCase, reverseGeocode } from "./mocks";
+import { createCase, getClarifyQuestions, reverseGeocode } from "./mocks";
 
 vi.mock("./mocks", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./mocks")>()),
   reverseGeocode: vi.fn(),
   createCase: vi.fn(),
+  // Continuing from Describe also fetches clarify questions (it may skip straight past
+  // Clarify if the grievance already answered everything); mocked here too so this file's
+  // "no network for the photo" tests aren't tripped up by that unrelated call.
+  getClarifyQuestions: vi.fn(),
 }));
 
 vi.mock("./LocationMap", () => ({
@@ -59,6 +63,12 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn();
   vi.mocked(reverseGeocode).mockReset().mockResolvedValue(ADDRESS);
   vi.mocked(createCase).mockReset().mockResolvedValue("case-1");
+  // At least one question, so the wizard lands on Clarify rather than skipping straight to
+  // decompose (another unmocked network call these tests don't care about).
+  vi.mocked(getClarifyQuestions).mockReset().mockResolvedValue({
+    answers: {},
+    questions: [{ key: "period", question: "What time period does this relate to?", options: ["Last 1 year"] }],
+  });
 });
 
 afterEach(() => {

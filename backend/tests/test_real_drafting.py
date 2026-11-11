@@ -117,6 +117,80 @@ def test_decompose_grievance_falls_back_on_empty_array(monkeypatch):
     assert requests == real.mock.decompose_grievance("The road is broken", {})
 
 
+def test_decompose_grievance_falls_back_when_a_title_invents_a_calendar_date(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [
+            {
+                "category": "Work order",
+                "title": "Work order issued between 1 July 2023 and 30 September 2023",
+                "quality": "good",
+            }
+        ],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+    assert requests == real.mock.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+
+def test_decompose_grievance_falls_back_when_a_title_invents_just_a_year(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [{"category": "Work order", "title": "Work order issued in 2023", "quality": "good"}],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {})
+
+    assert requests == real.mock.decompose_grievance("The road is broken", {})
+
+
+def test_decompose_grievance_falls_back_when_a_title_has_a_bracketed_placeholder(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [
+            {
+                "category": "Work order",
+                "title": "Work order for street light pole number [pole number]",
+                "quality": "good",
+            }
+        ],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {})
+
+    assert requests == real.mock.decompose_grievance("The road is broken", {})
+
+
+def test_decompose_grievance_falls_back_when_a_title_states_a_duration(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [
+            {"category": "Maintenance log", "title": "Maintenance log for the past six months", "quality": "good"}
+        ],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+    assert requests == real.mock.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+
+def test_decompose_grievance_allows_a_period_free_title(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: [{"category": "Work order", "title": "Copy of the work order", "quality": "good"}],
+    )
+
+    requests = real.decompose_grievance("The road is broken", {"period": "Last 3 months"})
+
+    assert requests[0].title == "Copy of the work order"
+
+
 SAMPLE_REQUEST = InformationRequest(
     id="RQ-001",
     category="Work order",
@@ -250,7 +324,9 @@ def test_quotes_lose_the_page_headers_of_the_cpwd_pdfs():
     assert grounding.clean("197 197 ANNEXURE TO SOPs 20.1.12A. The work") == "20.1.12A. The work"
 
 
-def test_decompose_and_draft_tell_the_model_todays_date(monkeypatch):
+def test_only_the_draft_is_told_todays_date(monkeypatch):
+    # Request titles carry no time at all (the period is its own field, and _is_fabricated
+    # rejects dates in titles), so only the draft, which states the period, needs the date.
     from datetime import date
 
     prompts = []
@@ -265,7 +341,15 @@ def test_decompose_and_draft_tell_the_model_todays_date(monkeypatch):
     real.generate_draft("Pothole for 6 months", [SAMPLE_REQUEST])
 
     today = date.today()
-    assert all(f"Today's date is {today.day} {today:%B %Y}" in prompt for prompt in prompts)
+    line = f"Today's date is {today.day} {today:%B %Y}"
+    assert line not in prompts[0]
+    assert line in prompts[1]
+
+
+def test_may_counts_as_a_month_only_beside_a_number():
+    assert not real._is_fabricated("Copy of any notice that may have been issued to the contractor")
+    assert real._is_fabricated("Copy of the work order dated 12 May")
+    assert real._is_fabricated("Inspection report of May 2026")
 
 
 def test_appeal_accepts_a_relief_list_after_the_grounds(monkeypatch):

@@ -15,6 +15,31 @@ from app.services.drafting.mock import DEFAULT_AUTHORITY
 
 logger = logging.getLogger(__name__)
 
+_MONTH_NAMES = (
+    "january", "february", "march", "april", "june", "july", "august",
+    "september", "october", "november", "december", "jan", "feb", "mar", "apr",
+    "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+)
+# The prompt tells the model never to invent a specific calendar date, but it does not
+# reliably obey that (seen in practice: "between 1 July 2023 and 30 September 2023" for a
+# period the citizen only described as "Last 3 months"). Catching it here, not just asking
+# nicely, is what actually keeps a fabricated date out of a request the citizen files.
+# "May" is also an ordinary word ("as may be required"), so it counts only next to a number.
+_FABRICATED_DATE = re.compile(
+    r"\b(" + "|".join(_MONTH_NAMES) + r")\b|\b(19|20)\d{2}\b|\b\d{1,2}\s+may\b|\bmay\s+\d{1,4}\b",
+    re.IGNORECASE,
+)
+# Also seen in practice: "street light pole number [pole number]" (a fill-in-the-blank slot
+# the model has no value for, left as literal brackets) and "for the past six months" in a
+# title alongside a period of "Last 3 months" the citizen actually chose. Both are the model
+# inventing specifics it doesn't have, same as a fabricated date.
+_PLACEHOLDER = re.compile(r"\[[^\]]+\]")
+_DURATION_PHRASE = re.compile(r"\b(last|past|previous)\s+\w+\s+(day|week|month|year)s?\b", re.IGNORECASE)
+
+
+def _is_fabricated(title: str) -> bool:
+    return bool(_FABRICATED_DATE.search(title) or _PLACEHOLDER.search(title) or _DURATION_PHRASE.search(title))
+
 CLARIFY_SYSTEM_PROMPT = """You help a citizen in Delhi file a Right to Information (RTI) \
 Act, 2005 application against the Public Works Department (PWD), Government of NCT of \
 Delhi, about a road-infrastructure grievance (e.g. a pothole or an unrepaired road).
@@ -48,17 +73,31 @@ road).
 
 Given the citizen's grievance and their answers to clarifying questions, break it down \
 into a list of specific RTI information requests a Public Information Officer (PIO) can \
-act on directly. Each request must ask for a concrete, existing record (a document, \
-order, report, or figure) — RTI compels disclosure of records, not explanations, so \
-never phrase a request as "why" something happened. Use the clarifying answers to make \
-requests more specific (e.g. naming the location or asset they identify), not just the \
-period. Name the place by its street or landmark; never put map coordinates in a title.
+act on directly. Each title must read as a request for a record, starting with something \
+like "Copy of", "Details of" or "Record of" — never as a statement describing what that \
+record says or when it was made, since you do not actually have the record yet. RTI \
+compels disclosure of records, not explanations, so never phrase a request as "why" \
+something happened. Use the clarifying answers to make requests more specific (e.g. \
+naming the location or asset they identify), not just the period. Name the place by its \
+street or landmark; never put map coordinates in a title.
+
+Never invent a specific calendar date, month or year (e.g. "between April 2023 and \
+September 2023") — you do not know the real dates and stating one as fact would be \
+misleading. The period the citizen chose (e.g. "Last 3 months") is tracked separately \
+and shown alongside every request, so leave time out of the title entirely — do not \
+restate it even in relative terms ("for the last three months", "during the past six \
+months"), and never state a different duration than the one the citizen actually chose.
+
+Never write a placeholder like "[pole number]" or "[date]" for a detail you don't have — \
+if you don't know it, either leave it out and describe the asset by location instead, or \
+mark the item "needs-detail" and let the citizen fill it in themselves; a literal \
+bracketed placeholder cannot be filed as is.
 
 Respond with ONLY a JSON array, no prose, no markdown fences. Each item:
 {"category": "<short label, e.g. Work order>", "title": "<the record being requested>", \
 "quality": "good" | "needs-detail"}
 Use "needs-detail" only when the title is still too vague for a PIO to act on without \
-more specifics (e.g. it is missing a location or date range); otherwise "good".
+more specifics (e.g. it is missing a location); otherwise "good".
 Produce between 2 and 5 items that actually fit the stated grievance (e.g. the work \
 order sanctioning the repair, amount spent, inspection/quality-check reports — whichever \
 apply)."""
@@ -136,7 +175,6 @@ def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[I
         user_prompt = f"Grievance: {grievance}\nClarifying answers:\n{answers}"
     else:
         user_prompt = f"Grievance: {grievance}\nPeriod of interest: {period}"
-    user_prompt += f"\n\n{todays_date_line()}"
 
     passages = _corpus_passages(grievance)
     system = DECOMPOSE_SYSTEM_PROMPT
@@ -150,6 +188,11 @@ def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[I
         items = llm.complete_json(system, user_prompt, max_tokens=6000)
         if not isinstance(items, list) or not items:
             raise ValueError(f"Expected a non-empty JSON array, got: {items!r}")
+
+        titles = [str(item["title"]) for item in items]
+        fabricated = [title for title in titles if _is_fabricated(title)]
+        if fabricated:
+            raise ValueError(f"Model invented a date, duration or placeholder in: {fabricated!r}")
 
         return [
             InformationRequest(

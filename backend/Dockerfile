@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 # app.services.live_fetch reuses the text extractors and the official-domain rule from ingest/.
 COPY ingest ./ingest
+# app.services.live_sources reads this at request time; nothing else under data/ is needed here.
+COPY data/live_sources.csv ./data/live_sources.csv
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
