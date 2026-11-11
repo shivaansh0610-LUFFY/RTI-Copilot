@@ -30,10 +30,13 @@ import { PrimaryButton, SecondaryButton, StepProgressBar } from "./ui";
 // already known from the original application.
 export default function RtiDraftingWizard({
   followUp,
+  starter,
   onDraftReady,
   onAnalyseReply,
 }: {
   followUp?: FollowUpContext;
+  // The opening words of the description, from a problem tile on the home page.
+  starter?: string;
   // Told the case and requests each time a draft is made, for the reply analysis later.
   onDraftReady?: (filed: FiledCase) => void;
   onAnalyseReply?: () => void;
@@ -43,7 +46,7 @@ export default function RtiDraftingWizard({
   const [grievance, setGrievance] = useState(
     followUp
       ? `Follow-up to an earlier RTI application to ${followUp.originalAuthority}. The reply did not fully answer ${followUp.requests.length} of the requests.`
-      : "",
+      : (starter ?? ""),
   );
   const [grievanceError, setGrievanceError] = useState("");
   // The photo never leaves this browser. The location reaches the backend only as the

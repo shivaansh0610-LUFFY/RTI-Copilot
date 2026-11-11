@@ -1,22 +1,40 @@
+import { Scale } from "lucide-react";
 import { useState } from "react";
+import HomePage from "./components/home/HomePage";
 import RtiDraftingWizard from "./components/rti-drafting-wizard";
 import ResponseAnalysisWizard from "./components/response-analysis-wizard";
 import type { FiledCase, FollowUpContext } from "./types";
 
-type Preview = "drafting" | "analysis";
+type View = "home" | "drafting" | "analysis";
 
 function App() {
-  const [preview, setPreview] = useState<Preview>("drafting");
+  const [view, setView] = useState<View>("home");
   const [followUp, setFollowUp] = useState<FollowUpContext | undefined>();
+  // A problem tile's opening sentence, for a fresh application.
+  const [starter, setStarter] = useState<string | undefined>();
   const [draftingKey, setDraftingKey] = useState(0);
   // The application drafted last, so its reply can be analysed against its own requests.
   const [filedCase, setFiledCase] = useState<FiledCase | undefined>();
   const [analysisKey, setAnalysisKey] = useState(0);
 
-  function handleFileFollowUp(context: FollowUpContext) {
-    setFollowUp(context);
+  function restartDrafting(nextFollowUp?: FollowUpContext, nextStarter?: string) {
+    setFollowUp(nextFollowUp);
+    setStarter(nextStarter);
     setDraftingKey((k) => k + 1);
-    setPreview("drafting");
+    setView("drafting");
+  }
+
+  function handleStart(tileStarter?: string) {
+    // A tile starts a new application; the plain button carries on with any draft in progress.
+    if (tileStarter) restartDrafting(undefined, tileStarter);
+    else openDrafting();
+  }
+
+  function openDrafting() {
+    // Opening drafting directly never continues a follow-up. (An ordinary draft in progress is
+    // kept: the wizard stays mounted while hidden.)
+    if (followUp) restartDrafting();
+    else setView("drafting");
   }
 
   function handleDraftReady(drafted: FiledCase) {
@@ -25,53 +43,47 @@ function App() {
     setAnalysisKey((k) => k + 1);
   }
 
+  const tab = (active: boolean) =>
+    "rounded-md px-3 py-1.5 text-sm font-medium " + (active ? "bg-slate-900 text-white" : "text-slate-600");
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="flex justify-center gap-2 border-b border-slate-200 bg-white p-3">
+      <nav className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <button
           type="button"
-          onClick={() => {
-            // Opening the tab directly starts a fresh application, not a follow-up. (An
-            // ordinary draft in progress is kept: the wizard stays mounted while hidden.)
-            if (preview !== "drafting" && followUp) {
-              setFollowUp(undefined);
-              setDraftingKey((k) => k + 1);
-            }
-            setPreview("drafting");
-          }}
-          className={
-            "rounded-md px-3 py-1.5 text-sm font-medium " +
-            (preview === "drafting" ? "bg-slate-900 text-white" : "text-slate-600")
-          }
+          onClick={() => setView("home")}
+          className="flex items-center gap-2 text-sm font-semibold text-slate-900"
         >
-          1. Draft your RTI
+          <Scale size={16} />
+          RTI Copilot
         </button>
-        <button
-          type="button"
-          onClick={() => setPreview("analysis")}
-          className={
-            "rounded-md px-3 py-1.5 text-sm font-medium " +
-            (preview === "analysis" ? "bg-slate-900 text-white" : "text-slate-600")
-          }
-        >
-          2. Analyse the reply
-        </button>
-      </div>
+        <div className="flex gap-1">
+          <button type="button" onClick={openDrafting} className={tab(view === "drafting")}>
+            1. Draft your RTI
+          </button>
+          <button type="button" onClick={() => setView("analysis")} className={tab(view === "analysis")}>
+            2. Analyse the reply
+          </button>
+        </div>
+      </nav>
 
-      {/* Both stay mounted so switching tabs never loses a draft or an analysis in progress. */}
-      <div hidden={preview !== "drafting"}>
+      {view === "home" && <HomePage onStart={handleStart} onAnalyse={() => setView("analysis")} />}
+
+      {/* Both wizards stay mounted so switching views never loses a draft or an analysis. */}
+      <div hidden={view !== "drafting"}>
         <RtiDraftingWizard
           key={draftingKey}
           followUp={followUp}
+          starter={starter}
           onDraftReady={handleDraftReady}
-          onAnalyseReply={() => setPreview("analysis")}
+          onAnalyseReply={() => setView("analysis")}
         />
       </div>
-      <div hidden={preview !== "analysis"}>
+      <div hidden={view !== "analysis"}>
         <ResponseAnalysisWizard
           key={analysisKey}
           filedCase={filedCase}
-          onFileFollowUp={handleFileFollowUp}
+          onFileFollowUp={(context) => restartDrafting(context)}
         />
       </div>
     </div>
