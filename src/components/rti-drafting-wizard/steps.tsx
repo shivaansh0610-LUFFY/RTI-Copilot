@@ -65,6 +65,8 @@ export function DescribeStep({
         value={grievance}
         onChange={(e) => onChange(e.target.value)}
         rows={6}
+        // The API takes 5,000 characters; this leaves room for the "Location:" line the map adds.
+        maxLength={4800}
         placeholder="e.g. The road in front of my house has been broken for two years and no one has repaired it..."
         className="rounded-md border border-slate-300 p-3 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
       />
@@ -186,6 +188,7 @@ export function RequestsStep({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               rows={2}
+              maxLength={1000}
               placeholder="e.g. Name of the contractor and the date the repair work was completed"
               className="rounded-md border border-slate-300 p-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
             />
@@ -203,6 +206,7 @@ export function RequestsStep({
               type="text"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
+              maxLength={80}
               placeholder="e.g. Contract, Expenditure, Attendance"
               className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
             />
@@ -257,6 +261,7 @@ export function QualityReviewStep({
             <input
               type="text"
               defaultValue={request.title}
+              maxLength={1000}
               onBlur={(e) => onTitleChange(request.id, e.target.value)}
               className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
             />

@@ -41,14 +41,14 @@ class ResponseAnalysis(ApiModel):
 
 
 class AppealItem(ApiModel):
-    request_id: str
-    title: str
+    request_id: str = Field(max_length=40)
+    title: str = Field(max_length=1000)
     label: ClassificationLabel
-    explanation: str
+    explanation: str = Field(max_length=2000)
 
 
 class AppealBody(ApiModel):
-    items: list[AppealItem] = Field(min_length=1)
+    items: list[AppealItem] = Field(min_length=1, max_length=20)
     language: Literal["en", "hi"] = "en"
 
 
