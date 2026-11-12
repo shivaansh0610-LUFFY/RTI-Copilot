@@ -32,25 +32,27 @@ REQUESTS = [
 
 
 def test_read_reply_numbers_the_passages_of_a_pdf():
-    pages, passages = read_reply("reply.pdf", make_pdf([REPLY_LINES, ["Public Information Officer"]]))
+    pages, passages, ocr_used = read_reply("reply.pdf", make_pdf([REPLY_LINES, ["Public Information Officer"]]))
 
     assert pages == 2
     assert [passage.id for passage in passages] == [f"P-{n}" for n in range(1, len(passages) + 1)]
     assert passages[-1].page == 2
     assert "WO/2026/12" in " ".join(passage.text for passage in passages)
+    assert ocr_used is False  # a PDF with a real text layer never needs it
 
 
 def test_read_reply_reads_plain_text():
-    pages, passages = read_reply("reply.txt", "\n\n".join(REPLY_LINES).encode())
+    pages, passages, ocr_used = read_reply("reply.txt", "\n\n".join(REPLY_LINES).encode())
 
     assert pages == 1
     assert any("copying charges" in passage.text for passage in passages)
+    assert ocr_used is False
 
 
 @pytest.mark.parametrize(
     ("filename", "data", "message"),
     [
-        ("scan.pdf", make_pdf([[]]), "scanned"),
+        ("scan.pdf", make_pdf([[]]), "even after OCR"),
         ("photo.jpg", b"\xff\xd8\xff\xe0 not text", "PDF and plain-text"),
         ("broken.pdf", b"%PDF-1.4 garbage", "could not be read"),
     ],
@@ -58,6 +60,22 @@ def test_read_reply_reads_plain_text():
 def test_read_reply_refuses_what_it_cannot_read(filename, data, message):
     with pytest.raises(UnreadableReply, match=message):
         read_reply(filename, data)
+
+
+def test_read_reply_falls_back_to_ocr_on_a_scanned_page(monkeypatch):
+    from ingest import extract
+
+    class _FakeOCRReader:
+        def readtext(self, image_bytes, detail=0, paragraph=True):
+            return ["Reply to RTI application.", "1. Scanned work order WO/2026/12 is enclosed."]
+
+    monkeypatch.setattr(extract, "_ocr_reader", _FakeOCRReader)
+
+    pages, passages, ocr_used = read_reply("scan.pdf", make_pdf([[]]))
+
+    assert pages == 1
+    assert ocr_used is True
+    assert "WO/2026/12" in " ".join(passage.text for passage in passages)
 
 
 # --- classifying it ---------------------------------------------------------------------------
@@ -180,7 +198,7 @@ def test_response_endpoint_explains_an_unreadable_file(client, case_id):
     response = upload(client, case_id, name="scan.pdf", data=make_pdf([[]]))
 
     assert response.status_code == 422
-    assert "scanned" in response.json()["detail"]
+    assert "even after OCR" in response.json()["detail"]
 
 
 # --- the appeal -------------------------------------------------------------------------------

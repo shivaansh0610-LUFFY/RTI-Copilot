@@ -35,7 +35,7 @@ class ClassificationResult(ApiModel):
 
 class ResponseAnalysis(ApiModel):
     pages: int
-    ocr_used: bool = False  # scans are refused, not read, so this is always False for now
+    ocr_used: bool = False  # true when at least one page had no selectable text and was OCR'd
     passages: list[ResponsePassage]
     results: list[ClassificationResult]
 

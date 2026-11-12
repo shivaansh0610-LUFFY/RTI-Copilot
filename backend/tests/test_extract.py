@@ -3,6 +3,7 @@ import io
 import pytest
 from corpus_support import clause, make_pdf
 
+from ingest import extract
 from ingest.extract import (
     MAX_CHARS,
     MIN_CHARS,
@@ -178,6 +179,52 @@ def test_unsupported_file_types_are_reported(tmp_path):
 def test_missing_file_is_an_os_error(tmp_path):
     with pytest.raises(OSError):
         extract_pages(tmp_path / "missing.pdf")
+
+
+# --- OCR fallback -------------------------------------------------------------------------------
+
+
+class _FakeOCRReader:
+    def __init__(self, lines):
+        self.lines = lines
+        self.calls = 0
+
+    def readtext(self, image_bytes, detail=0, paragraph=True):
+        self.calls += 1
+        return self.lines
+
+
+def test_a_page_with_almost_no_text_is_read_with_ocr(monkeypatch, tmp_path):
+    reader = _FakeOCRReader(["Scanned line one", "Scanned line two"])
+    monkeypatch.setattr(extract, "_ocr_reader", lambda: reader)
+    path = tmp_path / "scan.pdf"
+    path.write_bytes(make_pdf([[]]))  # a blank page: nothing for pypdf to find
+
+    assert pdf_pages(path) == ["Scanned line one\n\nScanned line two"]
+    assert reader.calls == 1
+
+
+def test_a_page_with_real_text_is_never_sent_to_ocr(monkeypatch, tmp_path):
+    reader = _FakeOCRReader(["should never appear"])
+    monkeypatch.setattr(extract, "_ocr_reader", lambda: reader)
+    path = tmp_path / "real.pdf"
+    path.write_bytes(make_pdf([["Plenty of real selectable text right here, well past the OCR threshold."]]))
+
+    pages = pdf_pages(path)
+
+    assert "should never appear" not in pages[0]
+    assert reader.calls == 0
+
+
+def test_ocr_failure_leaves_the_page_as_pypdf_found_it(monkeypatch, tmp_path):
+    def _broken():
+        raise RuntimeError("model failed to load")
+
+    monkeypatch.setattr(extract, "_ocr_reader", _broken)
+    path = tmp_path / "scan.pdf"
+    path.write_bytes(make_pdf([[]]))
+
+    assert pdf_pages(path) == [""]
 
 
 # --- HTML -------------------------------------------------------------------------------------

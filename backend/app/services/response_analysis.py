@@ -71,14 +71,16 @@ class UnreadableReply(ValueError):
     """The upload has no text to analyse; the message says why, for the citizen."""
 
 
-def read_reply(filename: str, data: bytes) -> tuple[int, list[ResponsePassage]]:
-    """The page count and the passages of a reply, numbered P-1, P-2, ... in reading order."""
+def read_reply(filename: str, data: bytes) -> tuple[int, list[ResponsePassage], bool]:
+    """The page count, the passages, and whether any page needed OCR, of a reply, numbered
+    P-1, P-2, ... in reading order."""
     if len(data) > MAX_BYTES:
         raise UnreadableReply(f"The file is over {MAX_BYTES // (1024 * 1024)} MB.")
     is_pdf = data.startswith(b"%PDF-") or filename.lower().endswith(".pdf")
+    ocr_flags: list[bool] = []
     if is_pdf:
         try:
-            pages = pdf_pages(io.BytesIO(data))
+            pages = pdf_pages(io.BytesIO(data), ocr_used=ocr_flags)
         except ExtractionError as error:
             raise UnreadableReply("The PDF could not be read. Is it damaged?") from error
         if len(pages) > MAX_PAGES:
@@ -99,10 +101,10 @@ def read_reply(filename: str, data: bytes) -> tuple[int, list[ResponsePassage]]:
             )
     if not passages:
         raise UnreadableReply(
-            "No text was found in this file. It may be a scanned paper reply; reading scans is "
-            "not supported yet, so please upload a PDF with selectable text."
+            "No text was found in this file, even after OCR -- is the file actually blank, or "
+            "too faint/skewed to read?"
         )
-    return len(pages), passages
+    return len(pages), passages, any(ocr_flags)
 
 
 def classify_reply(

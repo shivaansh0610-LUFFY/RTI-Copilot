@@ -8,6 +8,22 @@ from sqlalchemy import Engine
 from app import db
 from app.config import get_settings
 from app.main import app
+from ingest import extract
+
+
+@pytest.fixture(autouse=True)
+def no_real_ocr(monkeypatch):
+    """OCR runs on a real, heavy model (EasyOCR downloads its weights on first use) that tests
+    must never reach for -- it would make the suite slow, flaky offline, and dependent on
+    whatever the model actually reads off a test fixture. This stubs out only the recognition
+    step, so _ocr_page's own rendering logic still runs (cheap, local, no model); tests of OCR
+    itself give their own reader instead."""
+    monkeypatch.setattr(extract, "_ocr_reader", lambda: _NoOpOCRReader())
+
+
+class _NoOpOCRReader:
+    def readtext(self, image_bytes, detail=0, paragraph=True):
+        return []
 
 
 @pytest.fixture(autouse=True)

@@ -21,7 +21,7 @@ def analyse_response(case: CaseDep, session: SessionDep, file: UploadFile = File
 
     data = file.file.read(response_analysis.MAX_BYTES + 1)
     try:
-        pages, passages = response_analysis.read_reply(file.filename or "", data)
+        pages, passages, ocr_used = response_analysis.read_reply(file.filename or "", data)
     except response_analysis.UnreadableReply as error:
         raise HTTPException(422, str(error)) from error
 
@@ -31,7 +31,7 @@ def analyse_response(case: CaseDep, session: SessionDep, file: UploadFile = File
         results = [response_analysis.abstain(request.id, AI_OFF) for request in requests]
 
     case_store.update_case(case, session=session, status=case_store.RESPONSE_ANALYSED)
-    return ResponseAnalysis(pages=pages, passages=passages, results=results)
+    return ResponseAnalysis(pages=pages, ocr_used=ocr_used, passages=passages, results=results)
 
 
 @router.post("/appeal", response_model=AppealResponse)

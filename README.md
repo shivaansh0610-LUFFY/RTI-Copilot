@@ -84,8 +84,8 @@ The AI runs on Groq (`USE_LLM_DRAFTING`); without it every step falls back to te
 says so, never to invented content. `demo/DEMO.md` is a five-minute demo script, and
 `demo/sample-pio-reply.pdf` a made-up reply to try the analysis with.
 
-Next: deadline reminders by SMS or email, reading scanned replies, other authorities (MCD,
-NDMC, DJB), accounts, and deployment.
+Next: deadline reminders by SMS or email, other authorities (MCD, NDMC, DJB), accounts, and
+deployment.
 
 ## Running locally
 
@@ -106,16 +106,14 @@ backend. `npm test` runs the frontend tests (Vitest), `npm run lint` the linter.
 
 *Photo and location* (Describe step): "Take a photo" opens the phone's camera
 (a computer shows a file picker) and then asks the browser for the device's
-position; the browser shows its own permission prompt. The person confirms the
-spot on an OpenStreetMap map by dragging the pin or tapping the map. The street
-name comes from the backend's `/geocode`, and the result reaches the backend
-only as a `Location:` line in the grievance text. **The photo itself never
-leaves the browser.** No API key is needed. Two things to know when trying it:
-browsers only give a location to `https://` pages (and `localhost`), so test
-from a phone over https, for example through a tunnel; and the map uses
-OpenStreetMap's free public tiles, which suit a demo, so a busy deployment
-should switch to a tile provider it has an agreement with (`TILES` in
-`LocationMap.tsx`).
+GPS position; the browser shows its own permission prompt. There is no manual
+pin to place -- only the device's own GPS fix is ever used, so the location
+can never be a guess the citizen made rather than one the device confirmed.
+The street name comes from the backend's `/geocode`, and the result reaches
+the backend only as a `Location:` line in the grievance text. **The photo
+itself never leaves the browser.** No API key is needed. Browsers only give a
+location to `https://` pages (and `localhost`), so test from a phone over
+https, for example through a tunnel.
 
 **Backend** (FastAPI, in `backend/`):
 
@@ -155,6 +153,12 @@ model, BAAI/bge-large-en-v1.5 (about 1.3 GB, cached afterwards), and embedding
 the ~4,800 passages is slow on a laptop (about 27 minutes on an Apple-silicon
 Mac); a rerun that has nothing to do takes under a second. Search them with
 `app.services.retrieval.search_passages(query, k)`.
+
+A page with (almost) no selectable text -- a scanned manual, a photocopied PIO
+reply uploaded for response analysis -- is read with OCR (EasyOCR) instead of
+being skipped. The OCR models download on first use too (a few hundred MB,
+also cached afterwards) and a scanned page takes noticeably longer than a
+text page to ingest or analyse.
 
 The tests never load that model. A few of them (`test_load_documents.py`,
 `test_retrieval.py`, `test_case_store.py`, `test_case_requests.py`,

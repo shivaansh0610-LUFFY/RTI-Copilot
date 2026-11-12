@@ -11,10 +11,15 @@ is a blunt thing to cite. So paragraphs are rebuilt in three steps:
   2. split any piece longer than MAX_CHARS at sentence boundaries,
   3. merge neighbouring pieces until a paragraph would pass TARGET_CHARS.
 Paragraphs with no letters in them (a lone page number) are dropped.
+
+A page with (almost) no text to split -- a scanned manual, a photocopied PIO reply -- is read
+with EasyOCR instead; see pdf_pages().
 """
 
+import io
 import logging
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import BinaryIO
 
@@ -25,6 +30,11 @@ from pypdf.errors import PyPdfError
 # pypdf logs one warning for every font it cannot fully decode (hundreds for the CPWD manuals).
 # The text still extracts, so keep the console readable.
 logging.getLogger("pypdf").setLevel(logging.ERROR)
+
+# A page pypdf reads as emptier than this is treated as scanned, not blank, and sent to OCR.
+# A handful of stray characters (a page number, a stamp) should not count as "has text".
+OCR_THRESHOLD_CHARS = 20
+OCR_DPI = 300
 
 TARGET_CHARS = 700
 MAX_CHARS = 1200  # about 300-400 tokens, comfortably inside the 512 the embedding model reads
@@ -58,20 +68,61 @@ def extract_pages(path: Path) -> list[str]:
     raise ExtractionError(f"unsupported file type {suffix or '(none)'}: {path.name}")
 
 
-def pdf_pages(source: Path | BinaryIO) -> list[str]:
-    """The text of each page of a PDF file, or of PDF bytes held in a binary stream."""
+def pdf_pages(source: Path | BinaryIO, ocr_used: list[bool] | None = None) -> list[str]:
+    """The text of each page of a PDF file, or of PDF bytes held in a binary stream.
+
+    A page pypdf finds (almost) no text on is assumed scanned, not blank, and OCR'd instead --
+    a photocopied PIO reply or an old scanned manual has no selectable text at all, but is still
+    a real document a citizen needs read. When `ocr_used` is given, one bool is appended per
+    page: whether that page was sent to OCR (regardless of whether OCR then found anything)."""
     name = source.name if isinstance(source, Path) else "downloaded PDF"
+    data = source.read_bytes() if isinstance(source, Path) else source.read()
     try:
-        reader = PdfReader(source)
+        reader = PdfReader(io.BytesIO(data))
         pages = []
         for number, page in enumerate(reader.pages, start=1):
             try:
-                pages.append(page.extract_text() or "")
+                text = page.extract_text() or ""
             except Exception as error:  # pypdf raises many types on damaged pages; say which page
                 raise ExtractionError(f"{name}: could not read page {number}: {error}") from error
+            needs_ocr = len(text.strip()) < OCR_THRESHOLD_CHARS
+            if needs_ocr:
+                text = _ocr_page(data, number - 1) or text
+            if ocr_used is not None:
+                ocr_used.append(needs_ocr)
+            pages.append(text)
         return pages
     except PyPdfError as error:
         raise ExtractionError(f"{name}: not a readable PDF: {error}") from error
+
+
+@lru_cache
+def _ocr_reader():
+    import easyocr  # heavy import (torch, opencv); deferred until OCR is actually needed
+
+    # Hindi alongside English: this app drafts in Hindi too, and a government reply or notice
+    # (like a PWD Delhi / Bihar order) is as likely to be in Devanagari as in English. Reading a
+    # Hindi scan with an English-only model does not fail -- it just reads confident nonsense.
+    return easyocr.Reader(["en", "hi"], gpu=False, verbose=False)
+
+
+def _ocr_page(pdf_bytes: bytes, page_index: int) -> str:
+    """The text EasyOCR reads off one rendered page image, or "" if OCR itself fails.
+
+    OCR failing (a corrupt page, a missing model download) should not take down extraction for
+    a PDF that is otherwise fine -- the page just comes back with whatever little text pypdf
+    found, same as before OCR existed."""
+    import pymupdf  # renders the page without needing a system PDF tool like poppler
+
+    try:
+        with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
+            pixmap = doc[page_index].get_pixmap(dpi=OCR_DPI)
+            image_bytes = pixmap.tobytes("png")
+        lines = _ocr_reader().readtext(image_bytes, detail=0, paragraph=True)
+        return "\n\n".join(lines)
+    except Exception:
+        logging.getLogger(__name__).warning("OCR failed on page %d", page_index + 1, exc_info=True)
+        return ""
 
 
 def html_text(raw: bytes) -> str:

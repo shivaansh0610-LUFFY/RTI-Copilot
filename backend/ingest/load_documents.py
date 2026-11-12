@@ -81,7 +81,7 @@ def _ingest(session: Session, source: Source, backend_dir: Path, force: bool) ->
         for number, text in enumerate(split_paragraphs(page_text), 1)
     ]
     if not paragraphs:
-        raise ValueError(f"{path.name} has no extractable text (a scanned PDF would need OCR, which is not done)")
+        raise ValueError(f"{path.name} has no extractable text, even after OCR -- is the file actually blank?")
 
     print(f"  {path.name}: {len(pages)} pages, {len(paragraphs)} passages; embedding...", flush=True)
     vectors = embeddings.embed_texts([text for _, _, text in paragraphs])
