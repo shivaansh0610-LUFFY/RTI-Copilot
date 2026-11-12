@@ -7,7 +7,7 @@ import {
   MapPin,
   X,
 } from "lucide-react";
-import { lazy, Suspense, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import {
   formatCoordinates,
   googleMapsUrl,
@@ -17,14 +17,16 @@ import {
 import type { LocationPicker } from "./use-location-picker";
 import { useObjectUrl } from "./use-object-url";
 
-// Leaflet is only fetched once someone opens the map.
-const LocationMap = lazy(() => import("./LocationMap"));
-
 const CHIP =
   "flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-400";
 
 // A GPS fix this loose could be the wrong street; ask the citizen to check the pin.
 const LOOSE_FIX_METERS = 100;
+
+// A fix this loose isn't GPS or Wi-Fi at all -- it's the browser falling back to guessing from
+// the internet connection, which can be a different city entirely. Worth a stronger warning than
+// "approximate".
+const NETWORK_FIX_METERS = 10_000;
 
 export function PhotoLocation({
   photo,
@@ -51,7 +53,8 @@ export function PhotoLocation({
     }
     setPhotoError("");
     onPhotoChange(file);
-    // Taking the photo is the moment the citizen is at the spot. Don't move a pin they already set.
+    // Taking the photo is the moment the citizen is at the spot. Don't override a fix they
+    // already have, or start a second GPS request on top of one already running.
     if (!location && !picker.isLocating) picker.locateDevice();
   }
 
@@ -61,7 +64,7 @@ export function PhotoLocation({
       className="flex flex-col gap-3 rounded-md border border-slate-200 p-3"
     >
       <p className="text-[13px] font-medium text-slate-900">
-        Add a photo and mark the spot <span className="font-normal text-slate-500">(optional)</span>
+        Add a photo <span className="font-normal text-slate-500">(optional)</span>
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -73,12 +76,6 @@ export function PhotoLocation({
           <ImagePlus size={13} />
           Choose from gallery
         </button>
-        {!picker.showMap && (
-          <button type="button" onClick={picker.openMap} className={CHIP}>
-            <MapPin size={13} />
-            Choose on map
-          </button>
-        )}
       </div>
 
       {/* capture="environment" opens the back camera on a phone; a computer shows a file picker. */}
@@ -142,42 +139,36 @@ export function PhotoLocation({
                 className="inline-flex items-center gap-1 text-slate-600 underline"
               >
                 <X size={12} />
-                Remove pin
+                Clear location
               </button>
             </p>
           </div>
         )}
 
-        {location?.accuracyMeters !== undefined && location.accuracyMeters > LOOSE_FIX_METERS && (
-          <p className="text-[13px] text-amber-600">
-            This position is only approximate. Drag the pin to the exact spot.
-          </p>
-        )}
-        {location && isClearlyOutsideDelhi(location) && (
+        {location?.accuracyMeters !== undefined && location.accuracyMeters > NETWORK_FIX_METERS && (
           <p className="flex items-start gap-1.5 text-[13px] text-amber-600">
             <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-            This spot looks to be outside Delhi, so a Delhi department may not be responsible for it.
+            This doesn&apos;t look like your real spot -- your browser guessed it from your internet
+            connection, not GPS. Please mention the exact location in your description instead.
           </p>
         )}
+        {location?.accuracyMeters !== undefined &&
+          location.accuracyMeters > LOOSE_FIX_METERS &&
+          location.accuracyMeters <= NETWORK_FIX_METERS && (
+            <p className="text-[13px] text-amber-600">
+              This position is only approximate -- mention the exact spot in your description if it matters.
+            </p>
+          )}
+        {location &&
+          isClearlyOutsideDelhi(location) &&
+          (location.accuracyMeters ?? 0) <= NETWORK_FIX_METERS && (
+            <p className="flex items-start gap-1.5 text-[13px] text-amber-600">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              This spot looks to be outside Delhi, so a Delhi department may not be responsible for it.
+            </p>
+          )}
         {picker.message && <p className="text-[13px] text-amber-600">{picker.message}</p>}
       </div>
-
-      {picker.showMap && (
-        <>
-          <Suspense
-            fallback={
-              <div className="flex h-64 items-center justify-center rounded-md border border-slate-200 text-[13px] text-slate-500">
-                Loading map…
-              </div>
-            }
-          >
-            <LocationMap location={location} onPick={picker.place} />
-          </Suspense>
-          <p className="text-xs text-slate-500">
-            Is the pin on the problem? Drag it, or tap the map to move it.
-          </p>
-        </>
-      )}
     </section>
   );
 }

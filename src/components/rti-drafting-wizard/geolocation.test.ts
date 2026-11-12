@@ -71,7 +71,7 @@ describe("getDeviceLocation", () => {
     for (const code of [1, 2, 3]) {
       getCurrentPosition.mockImplementation((_success, failure) => failure({ code }));
       const error = await getDeviceLocation().catch((caught: unknown) => caught);
-      expect((error as LocationError).message).toMatch(/map|Try again/);
+      expect((error as LocationError).message).toMatch(/description|Try again/);
     }
   });
 

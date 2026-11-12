@@ -4,13 +4,13 @@ export type LocationFailure = "unsupported" | "insecure" | "denied" | "unavailab
 
 // Shown to the citizen as they are, so each one says what to do next.
 const MESSAGES: Record<LocationFailure, string> = {
-  unsupported: "This browser can't detect your location. Tap the map to place the pin instead.",
+  unsupported: "This browser can't detect your location. Please mention it in your description instead.",
   insecure:
-    "Your location can only be read on a secure (https) page. Tap the map to place the pin instead.",
+    "Your location can only be read on a secure (https) page. Please mention it in your description instead.",
   denied:
-    "Location permission was denied. Allow it in your browser settings, or tap the map to place the pin instead.",
-  unavailable: "Your location couldn't be determined. Tap the map to place the pin instead.",
-  timeout: "Finding your location took too long. Try again, or tap the map to place the pin.",
+    "Location permission was denied. Allow it in your browser settings, or mention the location in your description instead.",
+  unavailable: "Your location couldn't be determined. Please mention it in your description instead.",
+  timeout: "Finding your location took too long. Try again, or mention it in your description instead.",
 };
 
 export class LocationError extends Error {

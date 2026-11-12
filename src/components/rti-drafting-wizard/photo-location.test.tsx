@@ -1,5 +1,6 @@
-// The Describe step as a citizen meets it: the real wizard, with only the network (mocks.ts), the
-// map (Leaflet, covered in location-map.test.tsx) and the browser's geolocation faked.
+// The Describe step as a citizen meets it: the real wizard, with only the network (mocks.ts) and
+// the browser's geolocation faked. Location comes from the device's GPS only -- there is no
+// manual pin to fake or to test.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import RtiDraftingWizard from "./index";
@@ -13,23 +14,6 @@ vi.mock("./mocks", async (importOriginal) => ({
   // Clarify if the grievance already answered everything); mocked here too so this file's
   // "no network for the photo" tests aren't tripped up by that unrelated call.
   getClarifyQuestions: vi.fn(),
-}));
-
-vi.mock("./LocationMap", () => ({
-  default: ({
-    location,
-    onPick,
-  }: {
-    location?: { latitude: number; longitude: number };
-    onPick: (latitude: number, longitude: number) => void;
-  }) => (
-    <div data-testid="map">
-      <span>{location ? `pin at ${location.latitude}, ${location.longitude}` : "no pin yet"}</span>
-      <button type="button" onClick={() => onPick(28.7041, 77.1025)}>
-        tap the map
-      </button>
-    </div>
-  ),
 }));
 
 const CONNAUGHT_PLACE = { latitude: 28.6315, longitude: 77.2167 };
@@ -75,7 +59,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// Lets promises settle (the lazy map, a GPS fix) without moving the clock.
+// Lets promises settle (a GPS fix resolving) without moving the clock.
 const flush = () => act(async () => {});
 // Moves the clock past the pause before the street name is looked up, then lets it answer.
 const waitForLookup = () =>
@@ -94,11 +78,6 @@ async function choosePhoto(
   await flush();
 }
 
-async function tapMap() {
-  fireEvent.click(screen.getByRole("button", { name: "tap the map" }));
-  await flush();
-}
-
 describe("taking a photo", () => {
   it("shows the photo, finds the spot, and writes it into the description", async () => {
     gpsFix(CONNAUGHT_PLACE, 12);
@@ -108,7 +87,6 @@ describe("taking a photo", () => {
 
     expect(screen.getByAltText("The photo you added")).toBeTruthy();
     expect(getCurrentPosition).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId("map").textContent).toContain("pin at 28.6315, 77.2167");
     expect(description().value).toBe("Location: 28.63150, 77.21670");
     expect(screen.getByText(/GPS accuracy about 12 m/)).toBeTruthy();
 
@@ -147,17 +125,17 @@ describe("taking a photo", () => {
     }
   });
 
-  it("does not move a pin the citizen has already placed", async () => {
+  it("does not start a second GPS request for a spot already found", async () => {
     gpsFix(CONNAUGHT_PLACE);
     render(<RtiDraftingWizard />);
-    fireEvent.click(screen.getByRole("button", { name: /Choose on map/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Use my current location/ }));
     await flush();
-    await tapMap(); // the citizen puts the pin on the pothole
+    await waitForLookup();
+    getCurrentPosition.mockClear();
 
-    await choosePhoto(); // and then adds a photo of it
+    await choosePhoto(); // and then adds a photo of the same spot
 
     expect(getCurrentPosition).not.toHaveBeenCalled();
-    expect(screen.getByTestId("map").textContent).toContain("pin at 28.7041, 77.1025");
   });
 
   it("refuses a file that is not an image, and never asks for the location", async () => {
@@ -189,14 +167,13 @@ describe("when the location cannot be found", () => {
     [1, /permission was denied/],
     [2, /couldn't be determined/],
     [3, /took too long/],
-  ])("explains browser error %i and leaves the map open to pin by hand", async (code, message) => {
+  ])("explains browser error %i", async (code, message) => {
     gpsFails(code);
     render(<RtiDraftingWizard />);
 
     await choosePhoto();
 
     expect(screen.getByText(message)).toBeTruthy();
-    expect(screen.getByTestId("map").textContent).toContain("no pin yet");
     expect(description().value).toBe("");
   });
 
@@ -208,17 +185,6 @@ describe("when the location cannot be found", () => {
 
     expect(screen.getByText(/secure \(https\) page/)).toBeTruthy();
     expect(getCurrentPosition).not.toHaveBeenCalled();
-  });
-
-  it("lets the citizen pin the spot by hand after a refusal", async () => {
-    gpsFails(1);
-    render(<RtiDraftingWizard />);
-    await choosePhoto();
-
-    await tapMap();
-
-    expect(screen.queryByText(/permission was denied/)).toBeNull();
-    expect(description().value).toBe("Location: 28.70410, 77.10250");
   });
 
   it("keeps the photo even when there is no location", async () => {
@@ -271,25 +237,7 @@ describe("the street name", () => {
     expect(description().value).toContain(`Location: ${ADDRESS} (28.63150, 77.21670)`);
   });
 
-  it("waits before asking, so a pin being nudged sends one request, not many", async () => {
-    render(<RtiDraftingWizard />);
-    fireEvent.click(screen.getByRole("button", { name: /Choose on map/ }));
-    await flush();
-
-    const wait = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
-    await tapMap();
-    await wait(300); // each nudge comes before the pause is over, so it restarts the pause
-    await tapMap();
-    await wait(300);
-    await tapMap();
-    await wait(300);
-    expect(reverseGeocode).not.toHaveBeenCalled();
-    await waitForLookup();
-
-    expect(reverseGeocode).toHaveBeenCalledTimes(1);
-  });
-
-  it("ignores a slow answer for a spot the pin has since left", async () => {
+  it("ignores a slow answer for a spot the citizen has since re-located from", async () => {
     let answerForFirstSpot: (address: string) => void = () => {};
     vi.mocked(reverseGeocode)
       .mockReset()
@@ -301,7 +249,9 @@ describe("the street name", () => {
     fireEvent.click(screen.getByRole("button", { name: /Use my current location/ }));
     await flush();
     await waitForLookup(); // the lookup for the first spot is now in flight, unanswered
-    await tapMap(); // the citizen moves the pin before it answers
+    gpsFix({ latitude: 28.7041, longitude: 77.1025 });
+    fireEvent.click(screen.getByRole("button", { name: /Use my current location/ })); // re-locate
+    await flush();
     await act(async () => {
       answerForFirstSpot("First Street, Karol Bagh"); // ...and now the old answer arrives
     });
@@ -339,78 +289,8 @@ describe("the street name", () => {
   });
 });
 
-describe("a GPS fix that arrives after the citizen has pinned the spot by hand", () => {
-  // The browser is still deciding (the permission prompt is open); the citizen taps the map.
-  function startLocatingThenPinByHand() {
-    let answer: { succeed: () => void; fail: () => void } = { succeed() {}, fail() {} };
-    getCurrentPosition.mockImplementation((success, failure) => {
-      answer = {
-        succeed: () => success({ coords: { ...CONNAUGHT_PLACE, accuracy: 9 } }),
-        fail: () => failure({ code: 1 }),
-      };
-    });
-    render(<RtiDraftingWizard />);
-    fireEvent.click(screen.getByRole("button", { name: /Use my current location/ }));
-    return {
-      pinByHand: async () => {
-        await flush();
-        await tapMap();
-      },
-      answer: () => answer,
-    };
-  }
-
-  it("does not move the pin", async () => {
-    const { pinByHand, answer } = startLocatingThenPinByHand();
-    await pinByHand();
-
-    await act(async () => answer().succeed());
-
-    expect(screen.getByTestId("map").textContent).toContain("pin at 28.7041, 77.1025");
-    expect(description().value).toBe("Location: 28.70410, 77.10250");
-    expect(screen.queryByText(/GPS accuracy/)).toBeNull();
-  });
-
-  it("does not show a refusal that no longer matters", async () => {
-    const { pinByHand, answer } = startLocatingThenPinByHand();
-    await pinByHand();
-
-    await act(async () => answer().fail());
-
-    expect(screen.queryByText(/permission was denied/)).toBeNull();
-    expect(description().value).toBe("Location: 28.70410, 77.10250");
-  });
-
-  it("stops saying it is looking for the location", async () => {
-    const { pinByHand, answer } = startLocatingThenPinByHand();
-    await pinByHand();
-
-    await act(async () => answer().succeed());
-
-    expect(screen.queryByText(/Finding your location/)).toBeNull();
-    const button = screen.getByRole("button", { name: /Use my current location/ }) as HTMLButtonElement;
-    expect(button.disabled).toBe(false);
-  });
-});
-
-describe("the spot on the map", () => {
-  it("is replaced, not added to, when the pin moves", async () => {
-    render(<RtiDraftingWizard />);
-    type("A pothole outside my house.");
-    fireEvent.click(screen.getByRole("button", { name: /Choose on map/ }));
-    await flush();
-
-    await tapMap();
-    await waitForLookup();
-    await tapMap();
-    await waitForLookup();
-
-    const lines = description().value.split("\n").filter((line) => line.startsWith("Location:"));
-    expect(lines).toEqual([`Location: ${ADDRESS} (28.70410, 77.10250)`]);
-    expect(description().value.startsWith("A pothole outside my house.")).toBe(true);
-  });
-
-  it("is taken out of the description, and the map closed, by 'Remove pin'", async () => {
+describe("the detected spot", () => {
+  it("is cleared from the description by 'Clear location'", async () => {
     gpsFix(CONNAUGHT_PLACE);
     render(<RtiDraftingWizard />);
     type("A pothole outside my house.");
@@ -418,11 +298,10 @@ describe("the spot on the map", () => {
     await flush();
     await waitForLookup();
 
-    fireEvent.click(screen.getByRole("button", { name: /Remove pin/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Clear location/ }));
     await flush();
 
     expect(description().value).toBe("A pothole outside my house.");
-    expect(screen.queryByTestId("map")).toBeNull();
   });
 
   it("links to Google Maps for the citizen to check, with no key involved", async () => {
@@ -447,7 +326,7 @@ describe("the spot on the map", () => {
     fireEvent.click(screen.getByRole("button", { name: /Use my current location/ }));
     await flush();
 
-    expect(screen.getByText(/only approximate. Drag the pin/)).toBeTruthy();
+    expect(screen.getByText(/only approximate/)).toBeTruthy();
   });
 
   it("does not warn about a good fix", async () => {
@@ -542,7 +421,6 @@ describe("continuing from the Describe step", () => {
     await flush();
 
     expect(screen.getByAltText("The photo you added")).toBeTruthy();
-    expect(screen.getByTestId("map").textContent).toContain("pin at 28.6315, 77.2167");
     expect(description().value).toContain(`Location: ${ADDRESS}`);
   });
 });

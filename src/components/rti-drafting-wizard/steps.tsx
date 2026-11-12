@@ -30,7 +30,7 @@ export function DescribeStep({
   location: IssueLocation | undefined;
   onLocationChange: (location: IssueLocation | undefined) => void;
 }) {
-  const picker = useLocationPicker(location, onLocationChange);
+  const picker = useLocationPicker(onLocationChange);
 
   return (
     <div className="flex flex-col gap-2">
