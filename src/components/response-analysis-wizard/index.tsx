@@ -166,7 +166,9 @@ export default function ResponseAnalysisWizard({
             />
           )}
 
-          {step === "align" && <AlignStep requests={requests} alignment={alignment} />}
+          {step === "align" && (
+            <AlignStep requests={requests} alignment={alignment} passages={ingestResult?.passages ?? []} />
+          )}
 
           {step === "classify" && <ClassifyStep requests={requests} results={classifications} />}
 

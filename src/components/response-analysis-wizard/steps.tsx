@@ -93,12 +93,42 @@ export function UploadStep({
 export function AlignStep({
   requests,
   alignment,
+  passages,
 }: {
   requests: InformationRequest[];
   alignment: Record<string, ResponsePassage[]>;
+  passages: ResponsePassage[];
 }) {
+  const [showExtractedText, setShowExtractedText] = useState(false);
   return (
     <div className="flex flex-col gap-3">
+      {passages.length > 0 && (
+        <div className="rounded-md border border-slate-200 p-4">
+          <button
+            type="button"
+            onClick={() => setShowExtractedText((shown) => !shown)}
+            className="text-sm font-medium text-slate-900 underline"
+          >
+            {showExtractedText ? "Hide" : "View"} the text read from your file ({passages.length} passages)
+          </button>
+          <p className="mt-1 text-xs text-slate-500">
+            Check this against the original if a match below looks wrong -- a scan OCR misread would
+            show up here first.
+          </p>
+          {showExtractedText && (
+            <div className="mt-3 flex max-h-96 flex-col gap-2 overflow-y-auto">
+              {passages.map((passage) => (
+                <blockquote key={passage.id} className="border-l-2 border-slate-200 pl-2 text-sm text-slate-700">
+                  "{passage.text}"
+                  <span className="mt-0.5 block text-xs text-slate-400">
+                    p.{passage.page} &para;{passage.paragraph}
+                  </span>
+                </blockquote>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {requests.map((request) => {
         const passages = alignment[request.id] ?? [];
         return (
