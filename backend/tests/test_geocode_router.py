@@ -1,3 +1,5 @@
+import pytest
+
 from app.services import geocoding
 
 
@@ -25,3 +27,8 @@ def test_geocode_rejects_missing_coordinates(client):
     response = client.post("/geocode", json={"latitude": 28.6315})
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("body", [{"latitude": 1e9, "longitude": 77.2}, {"latitude": 28.6, "longitude": -181}])
+def test_geocode_rejects_impossible_coordinates(client, body):
+    assert client.post("/geocode", json=body).status_code == 422

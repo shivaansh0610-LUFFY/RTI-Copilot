@@ -1,11 +1,52 @@
 import type {
+  AppealItem,
   ClassificationResult,
   InformationRequest,
+  ResponseAnalysis,
   ResponsePassage,
 } from "../../types";
 
-// Mock backend calls — each is a single async function so it's a one-line
-// swap for a real API call later. Replace the body, keep the signature.
+// Unset means "run on the built-in mock data without the backend".
+const API_URL: string | undefined = import.meta.env.VITE_API_URL;
+
+// The real analysis needs the backend and a case whose requests it has stored.
+export function canAnalyseForReal(caseId: string | undefined): caseId is string {
+  return Boolean(API_URL && caseId);
+}
+
+// The backend's own explanation ({"detail": "..."}), so the citizen sees why, e.g. "a scanned reply".
+async function failure(response: Response): Promise<Error> {
+  try {
+    const body = await response.json();
+    if (typeof body?.detail === "string") return new Error(body.detail);
+  } catch {
+    // not JSON
+  }
+  return new Error(`The server answered with status ${response.status}. Please try again.`);
+}
+
+// POST /cases/:id/response (multipart upload): passages and one finding per stored request.
+export async function analyseResponse(caseId: string, file: File): Promise<ResponseAnalysis> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${API_URL}/cases/${caseId}/response`, { method: "POST", body: form });
+  if (!response.ok) throw await failure(response);
+  return response.json();
+}
+
+// POST /cases/:id/appeal: a Section 19(1) first appeal for the requests not properly answered.
+export async function draftAppeal(caseId: string, items: AppealItem[]): Promise<string> {
+  const response = await fetch(`${API_URL}/cases/${caseId}/appeal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  if (!response.ok) throw await failure(response);
+  const { appealText } = (await response.json()) as { appealText: string };
+  return appealText;
+}
+
+// Demo mode (no backend, or no drafted case): the calls below return fixed sample data.
 
 const MOCK_PASSAGES: ResponsePassage[] = [
   {

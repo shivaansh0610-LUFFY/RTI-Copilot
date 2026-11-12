@@ -1,4 +1,6 @@
+from app.config import get_settings
 from app.schemas import InformationRequest
+from app.services import grounding
 from app.services.drafting import real
 
 
@@ -199,13 +201,107 @@ SAMPLE_REQUEST = InformationRequest(
 )
 
 
+MB_PASSAGE = grounding.CorpusPassage(
+    id="S-1",
+    text="All measurements of work done shall be recorded in the Measurement Book. " * 8,
+    page=112,
+    source_title="CPWD Works Manual 2024",
+    url="https://cpwd.gov.in/WriteReadData/man_cir/65002.pdf",
+)
+
+
+def test_decompose_cites_only_passages_it_was_given(monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_corpus_citations", True)
+    monkeypatch.setattr(real.grounding, "relevant_passages", lambda grievance: [MB_PASSAGE])
+    seen = {}
+
+    def fake(system, user, **kwargs):
+        seen.update(system=system, user=user)
+        return [
+            {"category": "Measurement Book", "title": "Copy of the MB entries", "quality": "good", "basis": "S-1"},
+            {"category": "Work order", "title": "Copy of the work order", "quality": "good", "basis": "S-7"},
+            {"category": "x" * 200, "title": "Amount spent", "quality": "good", "basis": None},
+        ]
+
+    monkeypatch.setattr(real.llm, "complete_json", fake)
+
+    requests = real.decompose_grievance("Pothole on Ring Road", {"period": "Last 1 year"})
+
+    assert "[S-1] (CPWD Works Manual 2024, PDF page 112)" in seen["user"]
+    assert '"basis"' in seen["system"]
+    assert requests[0].basis.source_title == "CPWD Works Manual 2024"
+    assert requests[0].basis.page == 112
+    assert requests[0].basis.quote.endswith("…") and len(requests[0].basis.quote) <= 282
+    assert requests[1].basis is None  # S-7 was never offered
+    assert len(requests[2].category) == 80
+
+
+def test_decompose_works_without_the_corpus(monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_corpus_citations", True)
+
+    def no_database(grievance):
+        raise RuntimeError("passages table missing")
+
+    monkeypatch.setattr(real.grounding, "relevant_passages", no_database)
+    monkeypatch.setattr(
+        real.llm, "complete_json", lambda *a, **k: [{"category": "Work order", "title": "Copy of the work order"}]
+    )
+
+    requests = real.decompose_grievance("Pothole", {})
+
+    assert [request.title for request in requests] == ["Copy of the work order"]
+    assert requests[0].basis is None
+
+
+SECOND_REQUEST = SAMPLE_REQUEST.model_copy(
+    update={"id": "RQ-002", "category": "Expenditure", "title": "Amount spent on repairing the road"}
+)
+GRIEVANCE = "Pothole for 6 months.\n\nLocation: Ring Road, Lajpat Nagar (28.56700, 77.24300)"
+
+
+def test_generate_draft_returns_the_model_text(monkeypatch):
+    seen = {}
+
+    def fake(system, user, **kwargs):
+        seen.update(system=system, user=user)
+        return {"draft": "Under Section 6(1)...\n\n1. Copy of the work order\n2. Amount spent\n\nTransfer under 6(3)."}
+
+    monkeypatch.setattr(real.llm, "complete_json", fake)
+
+    draft = real.generate_draft(GRIEVANCE, [SAMPLE_REQUEST, SECOND_REQUEST], "hi")
+
+    assert draft.startswith("Under Section 6(1)")
+    # The grievance (with its location line) and every request reach the model, in order.
+    assert "Location: Ring Road, Lajpat Nagar" in seen["user"]
+    assert seen["user"].index(SAMPLE_REQUEST.title) < seen["user"].index(SECOND_REQUEST.title)
+    assert "exactly 2 numbered items" in seen["system"]
+    assert "Hindi" in seen["system"]
+
+
+def test_generate_draft_falls_back_when_a_request_is_merged_or_dropped(monkeypatch):
+    monkeypatch.setattr(real.llm, "complete_json", lambda *a, **k: {"draft": "Intro\n1. Both records together"})
+
+    draft = real.generate_draft(GRIEVANCE, [SAMPLE_REQUEST, SECOND_REQUEST])
+
+    assert draft == real.mock.generate_draft([SAMPLE_REQUEST, SECOND_REQUEST])
+
+
+def test_generate_draft_falls_back_on_failure(monkeypatch):
+    def raise_timeout(*args, **kwargs):
+        raise TimeoutError("Groq did not answer")
+
+    monkeypatch.setattr(real.llm, "complete_json", raise_timeout)
+
+    assert real.generate_draft(GRIEVANCE, [SAMPLE_REQUEST]) == real.mock.generate_draft([SAMPLE_REQUEST])
+
+
 def test_check_public_info_uses_the_real_lookup(monkeypatch):
     monkeypatch.setattr(real.public_info, "check_public_info", lambda requests: ["looked up"])
 
     assert real.check_public_info([SAMPLE_REQUEST]) == ["looked up"]
 
 
-def test_check_public_info_falls_back_to_mock_on_failure(monkeypatch):
+def test_check_public_info_marks_requests_unchecked_on_failure(monkeypatch):
     def raise_no_database(*args, **kwargs):
         raise RuntimeError("DATABASE_URL is not set")
 
@@ -213,5 +309,59 @@ def test_check_public_info_falls_back_to_mock_on_failure(monkeypatch):
 
     requests = real.check_public_info([SAMPLE_REQUEST])
 
-    # Falls back to the deterministic mock rather than letting the endpoint 500.
-    assert requests == real.mock.check_public_info([SAMPLE_REQUEST])
+    # No 500, and no invented citation: the mock would mark RQ-001 public with a made-up source.
+    assert [request.publicly_available for request in requests] == [None]
+    assert [request.public_source for request in requests] == [None]
+    assert requests[0].title == SAMPLE_REQUEST.title
+
+
+def test_quotes_lose_the_page_headers_of_the_cpwd_pdfs():
+    raw = (
+        "SECTION 53 CPWD WORKS MANUAL 2014 160 Years of Engineering Excellence 324 "
+        "Annexure - V Proforma For Quality Control Inspection"
+    )
+    assert grounding.quote(raw) == "Annexure - V Proforma For Quality Control Inspection"
+    assert grounding.clean("197 197 ANNEXURE TO SOPs 20.1.12A. The work") == "20.1.12A. The work"
+
+
+def test_only_the_draft_is_told_todays_date(monkeypatch):
+    # Request titles carry no time at all (the period is its own field, and _is_fabricated
+    # rejects dates in titles), so only the draft, which states the period, needs the date.
+    from datetime import date
+
+    prompts = []
+
+    def fake(system, user, **kwargs):
+        prompts.append(user)
+        return [{"category": "Work order", "title": "Copy of the work order"}] if len(prompts) == 1 else {"draft": "1. x"}
+
+    monkeypatch.setattr(real.llm, "complete_json", fake)
+
+    real.decompose_grievance("Pothole for 6 months", {"period": "About 6 months"})
+    real.generate_draft("Pothole for 6 months", [SAMPLE_REQUEST])
+
+    today = date.today()
+    line = f"Today's date is {today.day} {today:%B %Y}"
+    assert line not in prompts[0]
+    assert line in prompts[1]
+
+
+def test_may_counts_as_a_month_only_beside_a_number():
+    assert not real._is_fabricated("Copy of any notice that may have been issued to the contractor")
+    assert real._is_fabricated("Copy of the work order dated 12 May")
+    assert real._is_fabricated("Inspection report of May 2026")
+
+
+def test_appeal_accepts_a_relief_list_after_the_grounds(monkeypatch):
+    from app.schemas.responses import AppealItem
+    from app.services import appeal
+
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    items = [
+        AppealItem(request_id="RQ-1", title="A", label="NON_RESPONSIVE", explanation="x"),
+        AppealItem(request_id="RQ-2", title="B", label="EXEMPTION_CLAIMED", explanation="y"),
+    ]
+    text = "To, ...\n1. Ground A\n2. Ground B\nRelief:\n1. Direct the PIO\n2. Free of cost"
+    monkeypatch.setattr(appeal.llm, "complete_json", lambda *a, **k: {"appeal": text})
+
+    assert appeal.generate_appeal("Pothole", items) == text

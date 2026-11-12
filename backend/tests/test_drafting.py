@@ -73,6 +73,31 @@ def test_draft_returns_text_covering_each_request(client, case_id):
     assert body["flaggedRequestIds"] == ["RQ-002"]
 
 
+def test_draft_rejects_an_empty_application(client, case_id):
+    response = client.post(f"/cases/{case_id}/draft", json={"requests": []})
+    assert response.status_code == 422
+
+
+def test_draft_uses_the_model_when_llm_drafting_is_on(client, case_id, monkeypatch):
+    from app.config import get_settings
+    from app.services.drafting import real
+
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    seen = {}
+
+    def fake_generate_draft(grievance, requests, language):
+        seen.update(grievance=grievance, language=language)
+        return "1. " + requests[0].title
+
+    monkeypatch.setattr(real, "generate_draft", fake_generate_draft)
+    requests = decompose(client, case_id)[:1]
+    response = client.post(f"/cases/{case_id}/draft", json={"requests": requests, "language": "hi"})
+
+    assert response.status_code == 200
+    assert response.json()["draftText"] == "1. " + requests[0]["title"]
+    assert seen == {"grievance": "The road outside my house has been broken for two years.", "language": "hi"}
+
+
 def test_draft_flags_vague_titles(client, case_id):
     response = client.post(
         f"/cases/{case_id}/draft",
@@ -102,24 +127,32 @@ def test_draft_flags_vague_titles(client, case_id):
 
 
 def test_draft_warns_when_over_the_portal_character_limit(client, case_id):
-    long_title = "Copy of the work order sanctioning repair, " * 100  # well over 3,000 chars total
-    response = client.post(
-        f"/cases/{case_id}/draft",
-        json={
-            "requests": [
-                {
-                    "id": "RQ-001",
-                    "category": "Work order",
-                    "title": long_title,
-                    "authority": "PWD",
-                    "period": "Last 1 year",
-                    "quality": "good",
-                }
-            ]
-        },
-    )
+    # Five long but allowed titles (under 1,000 characters each) add up to over 3,000.
+    long_title = "Copy of the work order sanctioning repair, " * 20
+    requests = [
+        {
+            "id": f"RQ-00{n}",
+            "category": "Work order",
+            "title": long_title,
+            "authority": "PWD",
+            "period": "Last 1 year",
+            "quality": "good",
+        }
+        for n in range(1, 6)
+    ]
+    response = client.post(f"/cases/{case_id}/draft", json={"requests": requests})
     body = response.json()
     assert body["overLimit"] is True
     assert "3,000" in body["warning"]
     # Warned, not truncated.
-    assert long_title.strip() in body["draftText"]
+    assert body["draftText"].count(long_title.strip()) >= 5
+
+
+def test_api_refuses_oversized_input(client, case_id):
+    assert client.post("/cases", json={"grievanceText": "a" * 5001}).status_code == 422
+    request = {"id": "RQ-001", "category": "c", "title": "t" * 1001, "authority": "a", "period": "p", "quality": "good"}
+    assert client.post(f"/cases/{case_id}/draft", json={"requests": [request]}).status_code == 422
+    too_many = [dict(request, id=f"RQ-{n}", title="Copy of the work order") for n in range(21)]
+    assert client.post(f"/cases/{case_id}/draft", json={"requests": too_many}).status_code == 422
+    answers = {f"q{n}": "x" for n in range(11)}
+    assert client.post(f"/cases/{case_id}/decompose", json={"clarification": answers}).status_code == 422

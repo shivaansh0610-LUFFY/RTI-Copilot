@@ -1,10 +1,16 @@
-import { CornerDownRight, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
-import type { ClarifyQuestion, DraftResult, FollowUpContext, InformationRequest } from "../../types";
-import { ALL_STEPS, CASE_STATUS, type StepId } from "./constants";
+import { ArrowRight, CornerDownRight, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  ClarifyQuestion,
+  DraftLanguage,
+  DraftResult,
+  FiledCase,
+  FollowUpContext,
+  InformationRequest,
+} from "../../types";
+import { ALL_STEPS, type StepId } from "./constants";
 import { locationLine, withLocationLine, type IssueLocation } from "./location";
 import {
-  checkPublicInfo,
   createCase,
   createCustomRequest,
   decomposeGrievance,
@@ -15,21 +21,40 @@ import {
   ClarifyStep,
   DescribeStep,
   DraftStep,
-  PublicCheckStep,
   QualityReviewStep,
   RequestsStep,
 } from "./steps";
-import { PrimaryButton, SecondaryButton, StepProgressBar } from "./ui";
+import {
+  PageContainer,
+  PageHeader,
+  StepCard,
+  StepCardActions,
+  StepCardBody,
+  StepProgress,
+} from "../layout/Layout";
+import { PrimaryButton, SecondaryButton } from "./ui";
 
 // A follow-up starts at the Requests step: the grievance and clarification are
 // already known from the original application.
-export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpContext }) {
+export default function RtiDraftingWizard({
+  followUp,
+  starter,
+  onDraftReady,
+  onAnalyseReply,
+}: {
+  followUp?: FollowUpContext;
+  // The opening words of the description, from a problem tile on the home page.
+  starter?: string;
+  // Told the case and requests each time a draft is made, for the reply analysis later.
+  onDraftReady?: (filed: FiledCase) => void;
+  onAnalyseReply?: () => void;
+}) {
   const [step, setStep] = useState<StepId>(followUp ? "requests" : "describe");
 
   const [grievance, setGrievance] = useState(
     followUp
       ? `Follow-up to an earlier RTI application to ${followUp.originalAuthority}. The reply did not fully answer ${followUp.requests.length} of the requests.`
-      : "",
+      : (starter ?? ""),
   );
   const [grievanceError, setGrievanceError] = useState("");
   // The photo never leaves this browser. The location reaches the backend only as the
@@ -47,6 +72,8 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
   const [requestsError, setRequestsError] = useState("");
   const [carriedRequests, setCarriedRequests] = useState<InformationRequest[]>([]);
   const [draft, setDraft] = useState<DraftResult | undefined>();
+  const [draftError, setDraftError] = useState("");
+  const [language, setLanguage] = useState<DraftLanguage>("en");
   const [caseId, setCaseId] = useState<string | undefined>();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -58,11 +85,19 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
 
   const visibleSteps = useMemo(
     () =>
-      step === "describe" || step === "clarify" || step === "requests" || step === "public-check"
+      step === "describe" || step === "clarify" || step === "requests"
         ? ALL_STEPS
         : ALL_STEPS.filter((s) => s.id !== "quality-review" || needsQualityReview),
     [step, needsQualityReview],
   );
+
+  const stepNumber = visibleSteps.findIndex((s) => s.id === step) + 1;
+
+  // A new step starts at its top; on a phone the Continue button is far down the previous one.
+  useEffect(() => {
+    window.scrollTo?.({ top: 0 });
+  }, [step]);
+  const stepLabel = ALL_STEPS.find((s) => s.id === step)?.label ?? "";
 
   function handleLocationChange(location: IssueLocation | undefined) {
     setIssueLocation(location);
@@ -139,43 +174,40 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
     setRequests((prev) => prev.filter((r) => r.id !== id));
   }
 
+  // Every server call ends in .finally, so a failed one can never leave the spinner (and the
+  // disabled Back and Continue buttons) on for good.
+  function requestDraft(toDraft: InformationRequest[], draftLanguage: DraftLanguage) {
+    setDraftError("");
+    setIsLoading(true);
+    generateDraft(toDraft, caseId, draftLanguage)
+      .then((result) => {
+        setDraft(result);
+        setLanguage(draftLanguage);
+        setStep("draft");
+        onDraftReady?.({ caseId, requests: toDraft, grievance, draftText: result.draftText });
+      })
+      .catch(() => {
+        setDraftError("We couldn't create the draft. Please try again.");
+      })
+      .finally(() => setIsLoading(false));
+  }
+
   function handleRequestsContinue() {
     if (requests.length === 0) {
       setRequestsError("Add at least one request to continue.");
       return;
     }
     setRequestsError("");
-    setIsLoading(true);
-    checkPublicInfo(requests, caseId).then((result) => {
-      setRequests(result);
-      setIsLoading(false);
-      setStep("public-check");
-    });
-  }
-
-  function handlePublicCheckContinue() {
-    const nonPublic = requests.filter((r) => !r.publiclyAvailable);
-    setCarriedRequests(nonPublic);
-    const stillNeedsDetail = nonPublic.some((r) => r.quality === "needs-detail");
-    if (stillNeedsDetail) {
+    setCarriedRequests(requests);
+    if (requests.some((r) => r.quality === "needs-detail")) {
       setStep("quality-review");
     } else {
-      setIsLoading(true);
-      generateDraft(nonPublic, caseId).then((result) => {
-        setDraft(result);
-        setIsLoading(false);
-        setStep("draft");
-      });
+      requestDraft(requests, language);
     }
   }
 
   function handleQualityReviewContinue() {
-    setIsLoading(true);
-    generateDraft(carriedRequests, caseId).then((result) => {
-      setDraft(result);
-      setIsLoading(false);
-      setStep("draft");
-    });
+    requestDraft(carriedRequests, language);
   }
 
   function updateCarriedRequestTitle(id: string, title: string) {
@@ -183,23 +215,22 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
   }
 
   function goBack() {
+    setDraftError("");
     if (step === "clarify") setStep("describe");
     else if (step === "requests") setStep("clarify");
-    else if (step === "public-check") setStep("requests");
-    else if (step === "quality-review") setStep("public-check");
-    else if (step === "draft") setStep(needsQualityReview ? "quality-review" : "public-check");
+    else if (step === "quality-review") setStep("requests");
+    else if (step === "draft") setStep(needsQualityReview ? "quality-review" : "requests");
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">RTI Drafting Assistant</h1>
-        <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
-          {CASE_STATUS[step]}
-        </span>
-      </div>
+    <PageContainer>
+      <PageHeader
+        eyebrow={`Step ${stepNumber} of ${visibleSteps.length} · ${stepLabel}`}
+        title={followUp ? "Draft your follow-up RTI" : "Draft your RTI application"}
+        intro="Turn your complaint into an application that asks for the exact records PWD must keep."
+      />
 
-      <StepProgressBar steps={visibleSteps} currentStepId={step} />
+      <StepProgress steps={visibleSteps} currentId={step} />
 
       {followUp && (
         <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 p-3">
@@ -212,8 +243,8 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
         </div>
       )}
 
-      <div className="flex min-h-[360px] flex-col rounded-md border border-slate-200">
-        <div className="flex-1 p-6">
+      <StepCard>
+        <StepCardBody>
           {step === "describe" && (
             <DescribeStep
               grievance={grievance}
@@ -247,8 +278,6 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
             />
           )}
 
-          {step === "public-check" && <PublicCheckStep requests={requests} />}
-
           {step === "quality-review" && (
             <QualityReviewStep
               requests={carriedRequests}
@@ -256,10 +285,20 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
             />
           )}
 
-          {step === "draft" && draft && <DraftStep draft={draft} requests={carriedRequests} />}
-        </div>
+          {step === "draft" && draft && (
+            <DraftStep
+              draft={draft}
+              requests={carriedRequests}
+              language={language}
+              onLanguageChange={(next) => requestDraft(carriedRequests, next)}
+              isUpdating={isLoading}
+            />
+          )}
 
-        <div className="flex items-center justify-between border-t border-slate-200 p-4">
+          {draftError && <p className="mt-3 text-[13px] text-red-600">{draftError}</p>}
+        </StepCardBody>
+
+        <StepCardActions>
           <SecondaryButton onClick={goBack} disabled={step === "describe" || isLoading}>
             Back
           </SecondaryButton>
@@ -282,21 +321,23 @@ export default function RtiDraftingWizard({ followUp }: { followUp?: FollowUpCon
               Continue
             </PrimaryButton>
           )}
-          {step === "public-check" && (
-            <PrimaryButton onClick={handlePublicCheckContinue} disabled={isLoading}>
-              {isLoading && <Loader2 size={14} className="animate-spin" />}
-              Continue
-            </PrimaryButton>
-          )}
           {step === "quality-review" && (
             <PrimaryButton onClick={handleQualityReviewContinue} disabled={isLoading}>
               {isLoading && <Loader2 size={14} className="animate-spin" />}
               Continue
             </PrimaryButton>
           )}
-          {step === "draft" && <PrimaryButton disabled>Done</PrimaryButton>}
-        </div>
-      </div>
-    </div>
+          {step === "draft" &&
+            (onAnalyseReply ? (
+              <PrimaryButton onClick={onAnalyseReply} disabled={isLoading}>
+                Got the reply? Analyse it
+                <ArrowRight size={14} />
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton disabled>Done</PrimaryButton>
+            ))}
+        </StepCardActions>
+      </StepCard>
+    </PageContainer>
   );
 }

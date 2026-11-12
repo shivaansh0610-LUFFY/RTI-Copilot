@@ -9,5 +9,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
     restoreMocks: true,
+    // Tests run on the built-in mock data whatever the developer's own .env says, so a
+    // VITE_API_URL set for local runs never makes them call a real backend.
+    env: { VITE_API_URL: '' },
   },
 })

@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Off by default: needs a real database with the corpus loaded (see README). Until set,
     # public-info-check uses the deterministic mock.
     use_public_info_lookup: bool = False
+    # Off by default: needs the corpus loaded, and loads the 1.3 GB embedding model into the API.
+    # When set (with use_llm_drafting), each generated request cites the manual passage it rests on.
+    use_corpus_citations: bool = False
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 

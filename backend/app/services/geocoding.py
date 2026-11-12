@@ -6,6 +6,9 @@ identifying User-Agent header; never remove it. This app's volume is far below t
 rate limit (1 request/second), so no separate throttling is implemented here.
 """
 
+import threading
+import time
+
 import httpx
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
@@ -17,7 +20,24 @@ class GeocodingError(Exception):
     """The coordinates could not be turned into an address."""
 
 
+# The policy allows at most one request a second. The frontend already waits for the pin to
+# settle, but /geocode is a public endpoint, so the server keeps to the limit itself too.
+MIN_INTERVAL_SECONDS = 1.0
+_throttle = threading.Lock()
+_last_call = 0.0
+
+
+def _wait_for_turn() -> None:
+    global _last_call
+    with _throttle:
+        wait = _last_call + MIN_INTERVAL_SECONDS - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_call = time.monotonic()
+
+
 def reverse_geocode(latitude: float, longitude: float) -> str:
+    _wait_for_turn()
     try:
         response = httpx.get(
             NOMINATIM_URL,
@@ -29,8 +49,11 @@ def reverse_geocode(latitude: float, longitude: float) -> str:
     except httpx.HTTPError as error:
         raise GeocodingError(f"could not reach the geocoding service: {error}") from error
 
-    data = response.json()
-    if "error" in data or not data.get("display_name"):
+    try:
+        data = response.json()
+    except ValueError as error:
+        raise GeocodingError("the geocoding service sent an unreadable answer") from error
+    if not isinstance(data, dict) or "error" in data or not data.get("display_name"):
         raise GeocodingError(f"no address found for ({latitude}, {longitude})")
     return _short_address(data)
 

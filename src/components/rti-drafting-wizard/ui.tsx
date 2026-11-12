@@ -1,55 +1,5 @@
-import { Check, X } from "lucide-react";
+import { BookOpen, ExternalLink, X } from "lucide-react";
 import type { InformationRequest } from "../../types";
-import type { StepId } from "./constants";
-
-export function StepProgressBar({
-  steps,
-  currentStepId,
-}: {
-  steps: { id: StepId; label: string }[];
-  currentStepId: StepId;
-}) {
-  const currentIndex = steps.findIndex((s) => s.id === currentStepId);
-  return (
-    <div className="flex items-center">
-      {steps.map((step, index) => {
-        const isCompleted = index < currentIndex;
-        const isCurrent = index === currentIndex;
-        return (
-          <div key={step.id} className="flex flex-1 items-center last:flex-none">
-            <div className="flex flex-col items-center gap-1">
-              <div
-                className={
-                  "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium " +
-                  (isCompleted
-                    ? "bg-slate-900 text-white"
-                    : isCurrent
-                      ? "border-2 border-slate-900 text-slate-900"
-                      : "border border-slate-300 text-slate-400")
-                }
-              >
-                {isCompleted ? <Check size={14} /> : index + 1}
-              </div>
-              <span
-                className={
-                  "whitespace-nowrap text-[11px] " +
-                  (isCurrent ? "font-medium text-slate-900" : "text-slate-400")
-                }
-              >
-                {step.label}
-              </span>
-            </div>
-            {index < steps.length - 1 && (
-              <div
-                className={"mx-2 h-px flex-1 " + (isCompleted ? "bg-slate-900" : "bg-slate-200")}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export function CategoryBadge({ children }: { children: string }) {
   return (
@@ -154,6 +104,29 @@ export function RequestCard({
         <p className="mt-2 border-l-2 border-orange-200 pl-2 text-xs text-slate-600">
           {request.context}
         </p>
+      )}
+      {request.basis && (
+        <div className="mt-2 rounded-md bg-slate-50 p-2 text-xs text-slate-600">
+          <p className="flex items-center gap-1 font-medium text-slate-700">
+            <BookOpen size={12} />
+            Why ask for this
+          </p>
+          <p className="mt-1 italic">&ldquo;{request.basis.quote}&rdquo;</p>
+          <a
+            href={
+              // A browser's PDF viewer opens at the page given after #page=.
+              /\.pdf$/i.test(request.basis.url)
+                ? `${request.basis.url}#page=${request.basis.page}`
+                : request.basis.url
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-blue-700 underline"
+          >
+            {request.basis.sourceTitle}, PDF page {request.basis.page}
+            <ExternalLink size={11} />
+          </a>
+        </div>
       )}
       {children}
     </div>

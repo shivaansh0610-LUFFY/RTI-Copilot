@@ -1,6 +1,8 @@
-import { AlertTriangle, FilePlus2, FileUp, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, Copy, FilePlus2, FileUp, Loader2, Printer, Scale } from "lucide-react";
+import { printText } from "../../print";
 import { useState } from "react";
 import type {
+  AppealItem,
   ClassificationLabel,
   ClassificationResult,
   FollowUpContext,
@@ -15,20 +17,17 @@ export function UploadStep({
   onFileSelect,
   onProcess,
   isProcessing,
-  processingFailed,
+  processingError,
   ingestResult,
-  simulateFailure,
-  onToggleSimulateFailure,
 }: {
   file: File | null;
   onFileSelect: (file: File | null) => void;
   onProcess: () => void;
   isProcessing: boolean;
-  processingFailed: boolean;
+  processingError: string;
   ingestResult: { pages: number; passages: ResponsePassage[]; ocrUsed: boolean } | null;
-  simulateFailure: boolean;
-  onToggleSimulateFailure: () => void;
 }) {
+  const processingFailed = Boolean(processingError);
   return (
     <div className="flex flex-col gap-4">
       <label
@@ -54,9 +53,7 @@ export function UploadStep({
           <AlertTriangle size={16} className="mt-0.5 text-red-600" />
           <div>
             <p className="text-sm font-medium text-red-700">Processing failed</p>
-            <p className="text-[13px] text-red-600">
-              We couldn't process this file. Please retry.
-            </p>
+            <p className="text-[13px] text-red-600">{processingError}</p>
           </div>
         </div>
       )}
@@ -72,16 +69,10 @@ export function UploadStep({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-xs text-slate-500">
-          <input
-            type="checkbox"
-            checked={simulateFailure}
-            onChange={onToggleSimulateFailure}
-            className="h-3.5 w-3.5"
-          />
-          Dev: simulate processing failure
-        </label>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-slate-500">
+          The reply is read on the server to analyse it, and is not stored.
+        </p>
 
         {processingFailed ? (
           <SecondaryButton onClick={onProcess} disabled={isProcessing}>
@@ -207,10 +198,13 @@ export function SummaryStep({
   requests,
   results,
   onFileFollowUp,
+  onDraftAppeal,
 }: {
   requests: InformationRequest[];
   results: Record<string, ClassificationResult>;
   onFileFollowUp: (followUp: FollowUpContext) => void;
+  // Absent in demo mode, where there is no backend to draft with.
+  onDraftAppeal?: (items: AppealItem[]) => Promise<string>;
 }) {
   const counts: Partial<Record<ClassificationResult["label"], number>> = {};
   for (const request of requests) {
@@ -237,6 +231,39 @@ export function SummaryStep({
       else next.add(id);
       return next;
     });
+  }
+
+  const [appealText, setAppealText] = useState("");
+  const [appealError, setAppealError] = useState("");
+  const [isDraftingAppeal, setIsDraftingAppeal] = useState(false);
+  const [appealCopied, setAppealCopied] = useState(false);
+
+  function handleDraftAppeal() {
+    if (!onDraftAppeal) return;
+    const items: AppealItem[] = unanswered
+      .filter((r) => selected.has(r.id))
+      .map((r) => ({
+        requestId: r.id,
+        title: r.title,
+        label: results[r.id].label,
+        explanation: results[r.id].explanation,
+      }));
+    setAppealError("");
+    setIsDraftingAppeal(true);
+    onDraftAppeal(items)
+      .then(setAppealText)
+      .catch(() => setAppealError("We couldn't draft the appeal. Please try again."))
+      .finally(() => setIsDraftingAppeal(false));
+  }
+
+  function copyAppeal() {
+    navigator.clipboard
+      ?.writeText(appealText)
+      .then(() => {
+        setAppealCopied(true);
+        setTimeout(() => setAppealCopied(false), 2000);
+      })
+      .catch(() => setAppealCopied(false));
   }
 
   function handleFileFollowUp() {
@@ -284,8 +311,8 @@ export function SummaryStep({
               answered
             </p>
             <p className="mt-0.5 text-[13px] text-slate-600">
-              Select the ones you still want, and we'll start a follow-up RTI with them and the
-              context from this reply.
+              Select the ones you still want. You can draft a first appeal against this reply, or
+              start a follow-up RTI with them and the context from this reply.
             </p>
           </div>
           <div className="flex flex-col gap-2">
@@ -318,11 +345,52 @@ export function SummaryStep({
               If the reply was incomplete, you can also file a First Appeal (Section 19(1)) within
               30 days of receiving it.
             </p>
-            <PrimaryButton onClick={handleFileFollowUp} disabled={selected.size === 0}>
-              <FilePlus2 size={14} />
-              File follow-up RTI ({selected.size})
-            </PrimaryButton>
+            <div className="flex flex-wrap gap-2">
+              <SecondaryButton onClick={handleFileFollowUp} disabled={selected.size === 0}>
+                <FilePlus2 size={14} />
+                File follow-up RTI ({selected.size})
+              </SecondaryButton>
+              {onDraftAppeal && (
+                <PrimaryButton
+                  onClick={handleDraftAppeal}
+                  disabled={selected.size === 0 || isDraftingAppeal}
+                >
+                  {isDraftingAppeal ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Scale size={14} />
+                  )}
+                  Draft first appeal ({selected.size})
+                </PrimaryButton>
+              )}
+            </div>
           </div>
+          {appealError && <p className="text-[13px] text-red-600">{appealError}</p>}
+          {appealText && (
+            <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-slate-900">Your first appeal</p>
+                <div className="flex gap-2">
+                  <SecondaryButton onClick={copyAppeal}>
+                    {appealCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {appealCopied ? "Copied" : "Copy"}
+                  </SecondaryButton>
+                  <SecondaryButton
+                    onClick={() => printText("First appeal", appealText)}
+                    aria-label="Print or save as PDF"
+                  >
+                    <Printer size={14} />
+                    PDF
+                  </SecondaryButton>
+                </div>
+              </div>
+              <pre className="whitespace-pre-wrap font-mono text-xs text-slate-800">{appealText}</pre>
+              <p className="text-xs text-slate-500">
+                Fill in the parts in [brackets], read it through, and send it to the First Appellate
+                Authority within 30 days of the reply. This is not legal advice.
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-md border border-green-200 bg-green-50 p-4">
