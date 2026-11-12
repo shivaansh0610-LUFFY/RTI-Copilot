@@ -119,13 +119,15 @@ def _live_road_project_source(title: str) -> _PublicSourceRef | None:
         if words <= _title_words(project.searchable_text):
             # project.url (the API record) looks more specific but the site refuses direct
             # browser navigation to it ("Direct browser access to API endpoints is not
-            # allowed") -- confirmed by hand, not assumed. A citizen clicking it would hit a
-            # dead end, so the link goes to the real, browsable search page instead; the
-            # matched project's own name is quoted in the title so the citation is still
-            # specific even though the URL is the general page.
-            label = project.name if len(project.name) <= 90 else project.name[:87] + "..."
+            # allowed") -- confirmed by hand, not assumed. The link goes to the real,
+            # browsable search page instead; its own "Project ID / Name" search box (and the
+            # API behind it) finds this project by project_id, confirmed by hand -- so a
+            # citizen who pastes it in gets back exactly this one record, proof the citation
+            # is real without needing a clickable deep link.
+            label = project.name if len(project.name) <= 80 else project.name[:77] + "..."
             return _PublicSourceRef(
-                title=f"PWD Delhi Work Report (live): {label}", url=pwd_road_projects.SOURCE_PAGE_URL
+                title=f"PWD Delhi Work Report (live), Project ID {project.project_id}: {label}",
+                url=pwd_road_projects.SOURCE_PAGE_URL,
             )
     return None
 

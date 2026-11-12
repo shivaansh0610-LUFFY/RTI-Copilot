@@ -27,12 +27,25 @@ def test_fetch_road_projects_returns_one_entry_per_named_project(monkeypatch):
             "content": [
                 {
                     "id": 138871,
+                    "project_id": "PWD-138871",
                     "project_name": "Repair of Guru Ravidass Road",
                     "status": "working",
                     "tender_status": "awarded",
                 },
-                {"id": 2, "project_name": "", "status": "working", "tender_status": "awarded"},  # unnamed, skipped
+                {
+                    "id": 2,
+                    "project_id": "PWD-2",
+                    "project_name": "",
+                    "status": "working",
+                    "tender_status": "awarded",
+                },  # unnamed, skipped
                 {"project_name": "No id field", "status": "working", "tender_status": "awarded"},  # no id, skipped
+                {
+                    "id": 3,
+                    "project_name": "No project_id field",
+                    "status": "working",
+                    "tender_status": "awarded",
+                },  # no project_id, skipped
             ]
         }
     ).encode()
@@ -42,6 +55,7 @@ def test_fetch_road_projects_returns_one_entry_per_named_project(monkeypatch):
 
     assert len(projects) == 1
     assert projects[0].id == 138871
+    assert projects[0].project_id == "PWD-138871"
     assert projects[0].name == "Repair of Guru Ravidass Road"
     assert projects[0].searchable_text == "Repair of Guru Ravidass Road | working | awarded"
     assert projects[0].url == "https://pwddelhi.gov.in/api/projects/138871"

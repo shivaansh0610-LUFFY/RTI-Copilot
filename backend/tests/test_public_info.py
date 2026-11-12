@@ -230,6 +230,7 @@ def test_a_status_request_never_queries_the_static_corpus(monkeypatch):
 def test_a_records_request_matching_a_live_project_is_marked_public(monkeypatch):
     project = RoadProject(
         id=138317,
+        project_id="PWD-138317",
         name=(
             "A/R & M/O to various roads under PWD Division South East Road-2 during 2026-27 "
             "(SH: Providing manholes and bellmouths on Guru Ravidass Road of Sub Division 24 "
@@ -245,13 +246,16 @@ def test_a_records_request_matching_a_live_project_is_marked_public(monkeypatch)
 
     assert result.publicly_available is True
     # The API record itself refuses direct browser navigation, so the link goes to the real,
-    # browsable search page; the matched project's own name is still quoted in the title.
+    # browsable search page; the project ID is quoted so a citizen can paste it into that
+    # page's own search box and get back exactly this record.
     assert result.public_source.url == public_info.pwd_road_projects.SOURCE_PAGE_URL
-    assert result.public_source.title.startswith("PWD Delhi Work Report (live): A/R & M/O")
+    assert "Project ID PWD-138317" in result.public_source.title
 
 
 def test_a_records_request_not_in_the_live_feed_falls_back_to_the_corpus(monkeypatch):
-    project = RoadProject(id=1, name="Guru Ravidass Road works", status="working", tender_status="awarded")
+    project = RoadProject(
+        id=1, project_id="PWD-1", name="Guru Ravidass Road works", status="working", tender_status="awarded"
+    )
     monkeypatch.setattr(public_info.pwd_road_projects, "fetch_road_projects", lambda: [project])
     with database_session("sqlite") as session:
         stub_keyword_statement(monkeypatch, {})

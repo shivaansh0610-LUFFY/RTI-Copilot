@@ -36,8 +36,10 @@ TIMEOUT_SECONDS = 5.0
 USER_AGENT = "Mozilla/5.0 (compatible; RTI-Copilot-live/0.1)"
 # Where a citizen can browse this data themselves if they want the search UI instead of the
 # raw API response -- individual projects have no bookmarkable page of their own (the real
-# site opens them in a modal over the search results, not a separate URL).
-SOURCE_PAGE_URL = "https://pwddelhi.gov.in/maintenance-work/road"
+# site opens them in a modal over the search results, not a separate URL). Its own search box
+# (and the API's "search" param behind it, confirmed by hand) finds a project by project_id,
+# so RoadProject.project_id below is what a citizen types in there to get the exact one back.
+SOURCE_PAGE_URL = "https://pwddelhi.gov.in/project-work-report"
 
 
 class RoadProjectsFetchError(Exception):
@@ -47,6 +49,7 @@ class RoadProjectsFetchError(Exception):
 @dataclass(frozen=True)
 class RoadProject:
     id: int
+    project_id: str
     name: str
     status: str
     tender_status: str
@@ -87,12 +90,14 @@ def fetch_road_projects() -> list[RoadProject]:
     projects = []
     for project in raw_projects:
         name = str(project.get("project_name") or "").strip()
-        project_id = project.get("id")
-        if not name or not isinstance(project_id, int):
+        internal_id = project.get("id")
+        project_id = str(project.get("project_id") or "").strip()
+        if not name or not project_id or not isinstance(internal_id, int):
             continue
         projects.append(
             RoadProject(
-                id=project_id,
+                id=internal_id,
+                project_id=project_id,
                 name=name,
                 status=str(project.get("status") or "").strip(),
                 tender_status=str(project.get("tender_status") or "").strip(),
