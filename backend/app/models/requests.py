@@ -28,7 +28,7 @@ class CaseRequest(Base):
     authority: Mapped[str] = mapped_column(Text)
     period: Mapped[str] = mapped_column(String(80))
     quality: Mapped[str] = mapped_column(String(20))  # "good" or "needs-detail"
-    source: Mapped[str | None] = mapped_column(String(20))  # "generated", "custom" or "follow-up"
+    source: Mapped[str | None] = mapped_column(String(20))  # "generated", "custom", "follow-up" or "inspection"
     context: Mapped[str | None] = mapped_column(Text)
     # "already_public" or "not_found"; None means the public-availability check has not run.
     public_status: Mapped[str | None] = mapped_column(String(20))

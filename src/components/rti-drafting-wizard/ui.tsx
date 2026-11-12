@@ -55,6 +55,13 @@ export function SourceBadge({ source }: { source: InformationRequest["source"] }
       </span>
     );
   }
+  if (source === "inspection") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+        Section 2(j)
+      </span>
+    );
+  }
   if (source === "follow-up") {
     return (
       <span className="inline-flex items-center rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">

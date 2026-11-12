@@ -28,7 +28,8 @@ class InformationRequest(ApiModel):
     authority: str = Field(max_length=300)
     period: str
     quality: Literal["good", "needs-detail"]
-    source: Literal["generated", "custom", "follow-up"] | None = None
+    # "inspection": a Section 2(j) request to inspect the work or take samples, worded by the app.
+    source: Literal["generated", "custom", "follow-up", "inspection"] | None = None
     context: str | None = Field(default=None, max_length=2000)  # why this is being asked, e.g. what an earlier reply left out
     publicly_available: bool | None = None
     public_source: PublicSource | None = None  # where it was found, when publicly_available

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test } from "vitest";
 import App from "./App";
-import { PROBLEMS } from "./components/home/problems";
+import { PROBLEMS, REPAIR_STARTER } from "./components/home/problems";
 
 function description() {
   return screen.getByPlaceholderText(/The road in front of my house/) as HTMLTextAreaElement;
@@ -49,7 +49,8 @@ test("a drafted application appears in My RTIs, and filing it shows the reply de
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
   await screen.findByText(/has been broken down/);
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
-  await screen.findByText(/could use more detail/);
+  // The demo's "Details of amount spent" is too vague: the officer check says so.
+  await screen.findByText("The officer could use an excuse on 1 of 3 requests.");
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
   await screen.findByText(/If you file today/);
 
@@ -61,4 +62,25 @@ test("a drafted application appears in My RTIs, and filing it shows the reply de
   fireEvent.change(screen.getByLabelText("Filed on"), { target: { value: today } });
   expect(screen.getByText(/Reply due by .* \(30 days left\)/)).toBeTruthy();
   expect(JSON.parse(window.localStorage.getItem("rti-copilot:my-rtis") ?? "[]")[0].filedOn).toBe(today);
+});
+
+test("the home page's inspection link leads to a suggested inspection offer", async () => {
+  render(<App />);
+  expect(screen.getByText("RTI is more than photocopies")).toBeTruthy();
+  expect(screen.getByText(/Pass the officer check/)).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: /repair broke again\? start with an inspection/i }));
+  expect(description().value).toBe(REPAIR_STARTER);
+  fireEvent.change(description(), { target: { value: REPAIR_STARTER + "Ring Road, near the bus stop." } });
+  fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+
+  await screen.findByText("What time period does this relate to?");
+  fireEvent.click(screen.getByRole("button", { name: "Last 6 months" }));
+  fireEvent.click(screen.getByRole("button", { name: "No, not sure" }));
+  fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+
+  await screen.findByText(/has been broken down/);
+  expect(screen.getByText("Suggested for your complaint")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /ask to inspect the work/i }));
+  expect(screen.getByText("Inspection added")).toBeTruthy();
 });
