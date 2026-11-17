@@ -1,5 +1,7 @@
 # RTI Copilot
 
+[![CI](https://github.com/shivaansh0610-LUFFY/RTI-Copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/shivaansh0610-LUFFY/RTI-Copilot/actions/workflows/ci.yml)
+
 RTI Copilot is an AI-powered assistant that helps Indian citizens exercise their
 **Right to Information (RTI) Act, 2005** rights. It guides a user through
 identifying the correct public authority, drafting a legally sound RTI

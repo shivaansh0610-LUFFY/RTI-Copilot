@@ -1,5 +1,5 @@
 import pytest
-from corpus_support import add_source, database_session, make_pdf
+from corpus_support import add_source, database_session, make_pdf, sqlite_engine
 from sqlalchemy import select
 
 from app.models import Document, Passage, Source
@@ -19,6 +19,16 @@ def _no_live_road_projects_by_default(monkeypatch):
         raise public_info.pwd_road_projects.RoadProjectsFetchError("not called in this test")
 
     monkeypatch.setattr(public_info.pwd_road_projects, "fetch_road_projects", unreachable)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_database(monkeypatch):
+    """Tests that call check_public_info without a session make it open its own. Point that at
+    an empty in-memory database, so they neither need DATABASE_URL (CI has no .env) nor read
+    the developer's real corpus."""
+    with sqlite_engine() as engine:
+        monkeypatch.setattr(public_info, "get_engine", lambda: engine)
+        yield
 
 REQUEST = InformationRequest(
     id="RQ-001",
