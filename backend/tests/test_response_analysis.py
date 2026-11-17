@@ -65,11 +65,11 @@ def test_read_reply_refuses_what_it_cannot_read(filename, data, message):
 def test_read_reply_falls_back_to_ocr_on_a_scanned_page(monkeypatch):
     from ingest import extract
 
-    class _FakeOCRReader:
-        def readtext(self, image_bytes, detail=0, paragraph=True):
-            return ["Reply to RTI application.", "1. Scanned work order WO/2026/12 is enclosed."]
-
-    monkeypatch.setattr(extract, "_ocr_reader", _FakeOCRReader)
+    monkeypatch.setattr(
+        extract,
+        "_recognize_text",
+        lambda image_bytes: "Reply to RTI application.\n\n1. Scanned work order WO/2026/12 is enclosed.",
+    )
 
     pages, passages, ocr_used = read_reply("scan.pdf", make_pdf([[]]))
 

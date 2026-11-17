@@ -155,10 +155,14 @@ Mac); a rerun that has nothing to do takes under a second. Search them with
 `app.services.retrieval.search_passages(query, k)`.
 
 A page with (almost) no selectable text -- a scanned manual, a photocopied PIO
-reply uploaded for response analysis -- is read with OCR (EasyOCR) instead of
-being skipped. The OCR models download on first use too (a few hundred MB,
-also cached afterwards) and a scanned page takes noticeably longer than a
-text page to ingest or analyse.
+reply uploaded for response analysis -- is read with OCR (Tesseract, via
+`pytesseract`) instead of being skipped. This needs the `tesseract` binary
+installed separately (it is not a pip package) -- on Windows that's
+https://github.com/UB-Mannheim/tesseract/wiki, with `TESSERACT_CMD` settable
+if it lands somewhere other than the default `C:\Program Files\Tesseract-OCR`.
+Hindi language data ships in `backend/tessdata/` so no extra download is
+needed beyond the binary itself. A scanned page takes noticeably longer than
+a text page to ingest or analyse.
 
 The tests never load that model. A few of them (`test_load_documents.py`,
 `test_retrieval.py`, `test_case_store.py`, `test_case_requests.py`,

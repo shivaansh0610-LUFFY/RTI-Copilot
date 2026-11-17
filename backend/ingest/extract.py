@@ -13,12 +13,14 @@ is a blunt thing to cite. So paragraphs are rebuilt in three steps:
 Paragraphs with no letters in them (a lone page number) are dropped.
 
 A page with (almost) no text to split -- a scanned manual, a photocopied PIO reply -- is read
-with EasyOCR instead; see pdf_pages().
+with Tesseract instead; see pdf_pages().
 """
 
 import io
 import logging
+import os
 import re
+import shutil
 from functools import lru_cache
 from pathlib import Path
 from typing import BinaryIO
@@ -35,6 +37,21 @@ logging.getLogger("pypdf").setLevel(logging.ERROR)
 # A handful of stray characters (a page number, a stamp) should not count as "has text".
 OCR_THRESHOLD_CHARS = 20
 OCR_DPI = 300
+
+# The tesseract binary itself (installed separately; not a pip package). An env var wins if
+# set; otherwise PATH (how `apt-get install tesseract-ocr` leaves it in Docker/Linux), falling
+# back to the Windows installer's default location for a dev machine that hasn't added it to
+# PATH.
+TESSERACT_CMD = (
+    os.environ.get("TESSERACT_CMD")
+    or shutil.which("tesseract")
+    or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+)
+# Hindi language data ships inside the repo rather than relying on the system Tesseract install
+# having it -- the Windows installer only bundles English by default, and a teammate's machine
+# (or a server) should not need a separate, manual "go download hin.traineddata" step.
+TESSDATA_DIR = str(Path(__file__).resolve().parent.parent / "tessdata")
+OCR_LANGS = "eng+hin"
 
 TARGET_CHARS = 700
 MAX_CHARS = 1200  # about 300-400 tokens, comfortably inside the 512 the embedding model reads
@@ -97,20 +114,35 @@ def pdf_pages(source: Path | BinaryIO, ocr_used: list[bool] | None = None) -> li
 
 
 @lru_cache
-def _ocr_reader():
-    import easyocr  # heavy import (torch, opencv); deferred until OCR is actually needed
+def _configure_tesseract() -> None:
+    import pytesseract  # thin wrapper around the tesseract.exe binary; deferred until OCR is needed
 
-    # Hindi alongside English: this app drafts in Hindi too, and a government reply or notice
-    # (like a PWD Delhi / Bihar order) is as likely to be in Devanagari as in English. Reading a
-    # Hindi scan with an English-only model does not fail -- it just reads confident nonsense.
-    return easyocr.Reader(["en", "hi"], gpu=False, verbose=False)
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+
+
+def _recognize_text(image_bytes: bytes) -> str:
+    """The text Tesseract reads off one page image, in English and Hindi together.
+
+    Hindi alongside English: this app drafts in Hindi too, and a government reply or notice
+    (like a PWD Delhi / Bihar order) is as likely to be in Devanagari as in English. Reading a
+    Hindi scan with an English-only model does not fail -- it just reads confident nonsense."""
+    import pytesseract
+    from PIL import Image
+
+    _configure_tesseract()
+    # Passed as an env var, not a quoted --tessdata-dir config string: pytesseract splits its
+    # config string on whitespace before handing it to the tesseract binary, which mangles a
+    # Windows path's backslashes and quoting.
+    os.environ["TESSDATA_PREFIX"] = TESSDATA_DIR
+    image = Image.open(io.BytesIO(image_bytes))
+    return pytesseract.image_to_string(image, lang=OCR_LANGS).strip()
 
 
 def _ocr_page(pdf_bytes: bytes, page_index: int) -> str:
-    """The text EasyOCR reads off one rendered page image, or "" if OCR itself fails.
+    """The text OCR reads off one rendered page, or "" if OCR itself fails.
 
-    OCR failing (a corrupt page, a missing model download) should not take down extraction for
-    a PDF that is otherwise fine -- the page just comes back with whatever little text pypdf
+    OCR failing (a corrupt page, a missing tesseract install) should not take down extraction
+    for a PDF that is otherwise fine -- the page just comes back with whatever little text pypdf
     found, same as before OCR existed."""
     import pymupdf  # renders the page without needing a system PDF tool like poppler
 
@@ -118,8 +150,7 @@ def _ocr_page(pdf_bytes: bytes, page_index: int) -> str:
         with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
             pixmap = doc[page_index].get_pixmap(dpi=OCR_DPI)
             image_bytes = pixmap.tobytes("png")
-        lines = _ocr_reader().readtext(image_bytes, detail=0, paragraph=True)
-        return "\n\n".join(lines)
+        return _recognize_text(image_bytes)
     except Exception:
         logging.getLogger(__name__).warning("OCR failed on page %d", page_index + 1, exc_info=True)
         return ""
