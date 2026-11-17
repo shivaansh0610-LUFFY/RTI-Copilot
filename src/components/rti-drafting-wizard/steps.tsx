@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { printText } from "../../print";
+import PioReview from "../pio-review/PioReview";
 import type {
   ClarifyQuestion,
   DraftLanguage,
@@ -510,12 +511,15 @@ export function DraftStep({
   language,
   onLanguageChange,
   isUpdating,
+  onUseText,
 }: {
   draft: DraftResult;
   requests: InformationRequest[];
   language: DraftLanguage;
   onLanguageChange: (language: DraftLanguage) => void;
   isUpdating: boolean;
+  // The PIO review's improved version, when the citizen chooses to use it.
+  onUseText?: (text: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const flaggedTitles = requests.filter((request) => draft.flaggedRequestIds.includes(request.id));
@@ -604,6 +608,8 @@ export function DraftStep({
       <p className="text-right text-xs text-slate-400">
         {draft.charCount.toLocaleString()} / 3,000 characters
       </p>
+
+      <PioReview text={draft.draftText} onUse={onUseText} />
 
       <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-[13px] text-blue-900">
         <CalendarClock size={16} className="mt-0.5 shrink-0" />

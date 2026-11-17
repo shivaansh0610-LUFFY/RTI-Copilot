@@ -3,11 +3,17 @@ import { beforeEach, expect, test, vi } from "vitest";
 import type { DraftResult, FollowUpContext, InformationRequest } from "../../types";
 import RtiDraftingWizard from "./index";
 import { generateDraft, runPreflight } from "./mocks";
+import { reviewDraft } from "../pio-review/api";
 
 vi.mock("./mocks", async (original) => ({
   ...(await original<typeof import("./mocks")>()),
   generateDraft: vi.fn(),
   runPreflight: vi.fn(),
+}));
+
+vi.mock("../pio-review/api", async (original) => ({
+  ...(await original<typeof import("../pio-review/api")>()),
+  reviewDraft: vi.fn(),
 }));
 
 const draftMock = vi.mocked(generateDraft);
@@ -238,4 +244,28 @@ test("the 'what happens next' guide explains fees and lab tests", () => {
 
   expect(within(offer).getByText(/any fee with its calculation \(Section 7\(3\)\)/)).toBeTruthy();
   expect(within(offer).getByText(/accredited \(NABL\) laboratory/)).toBeTruthy();
+});
+
+test("the PIO review's improved version replaces the draft and is kept in My RTIs", async () => {
+  draftMock.mockResolvedValue(DRAFT);
+  const improved = "I hereby request information under Section 6(1) of the RTI Act, 2005.\n1. Copy of the work order";
+  vi.mocked(reviewDraft).mockResolvedValue({
+    score: 7,
+    outOf: 10,
+    verdict: "fix",
+    aiUsed: true,
+    checks: [{ id: "TRANSFER", label: "Asks for transfer", passed: false, why: "w", fix: "f", notes: [] }],
+    improved: { text: improved, score: 8, fixed: ["TRANSFER"] },
+  });
+  const onDraftReady = vi.fn();
+  render(<RtiDraftingWizard followUp={FOLLOW_UP} onDraftReady={onDraftReady} />);
+  await toDraft();
+
+  fireEvent.click(screen.getByRole("button", { name: /check like a pio/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /use this version/i }));
+
+  expect(vi.mocked(reviewDraft)).toHaveBeenCalledWith(DRAFT.draftText);
+  expect(screen.getByText(/1\. Copy of the work order$/m)).toBeTruthy();
+  expect(screen.getByText(`${improved.length} / 3,000 characters`)).toBeTruthy();
+  expect(onDraftReady).toHaveBeenLastCalledWith(expect.objectContaining({ draftText: improved }));
 });

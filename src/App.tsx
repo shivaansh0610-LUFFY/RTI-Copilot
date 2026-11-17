@@ -5,6 +5,7 @@ import MyRtis from "./components/tracker/MyRtis";
 import { loadRtis, saveRtis, titleFrom, upsertRti, type TrackedRti } from "./components/tracker/tracking";
 import RtiDraftingWizard from "./components/rti-drafting-wizard";
 import ResponseAnalysisWizard from "./components/response-analysis-wizard";
+import ReviewPage from "./components/pio-review/ReviewPage";
 import type { FiledCase, FollowUpContext } from "./types";
 
 function App() {
@@ -81,7 +82,14 @@ function App() {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <SiteHeader view={view} rtiCount={rtis.length} onNavigate={navigate} />
 
-      {view === "home" && <HomePage onStart={handleStart} onAnalyse={() => setView("analysis")} />}
+      {view === "home" && (
+        <HomePage onStart={handleStart} onAnalyse={() => setView("analysis")} onReview={() => navigate("review")} />
+      )}
+
+      {/* Kept mounted, like the wizards, so a pasted application survives a look elsewhere. */}
+      <div hidden={view !== "review"}>
+        <ReviewPage />
+      </div>
 
       {view === "rtis" && (
         <MyRtis

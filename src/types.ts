@@ -132,3 +132,42 @@ export interface ClassificationResult {
   evidence: ResponsePassage[];
   abstentionReason?: string; // required when label === "INSUFFICIENT_EVIDENCE"
 }
+
+// PIO review of a whole application (POST /review-draft). Mirrors backend/app/schemas/review.py.
+export interface ReviewPointNote {
+  point: number;
+  officerSays: string;
+}
+
+export interface ReviewCheck {
+  id: string;
+  label: string;
+  passed: boolean;
+  why?: string;
+  section?: string;
+  fix?: string;
+  notes: ReviewPointNote[];
+}
+
+// Something the AI, playing the officer, noticed about one point. Not part of the score.
+export interface ReviewAiNote {
+  point: number;
+  checkId: string;
+  officerSays: string;
+}
+
+export interface ImprovedDraft {
+  text: string;
+  score: number;
+  fixed: string[];
+}
+
+export interface DraftReview {
+  score: number;
+  outOf: number;
+  verdict: "ready" | "fix" | "weak";
+  checks: ReviewCheck[]; // fixed rules only: they make the score
+  aiNotes?: ReviewAiNote[];
+  improved?: ImprovedDraft;
+  aiUsed: boolean;
+}

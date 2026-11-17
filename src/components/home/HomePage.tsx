@@ -8,6 +8,7 @@ import {
   Gavel,
   MapPin,
   Scale,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { PROBLEMS, REPAIR_STARTER } from "./problems";
@@ -57,9 +58,11 @@ const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
 export default function HomePage({
   onStart,
   onAnalyse,
+  onReview,
 }: {
   onStart: (starter?: string) => void;
   onAnalyse: () => void;
+  onReview?: () => void;
 }) {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 sm:px-6">
@@ -91,8 +94,43 @@ export default function HomePage({
           >
             <Scale size={14} />I got a reply
           </button>
+          {onReview && (
+            <button
+              type="button"
+              onClick={onReview}
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+            >
+              <ShieldCheck size={14} />
+              Check my draft
+            </button>
+          )}
         </div>
       </section>
+
+      {onReview && (
+        <section
+          aria-labelledby="review-heading"
+          className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4"
+        >
+          <h2 id="review-heading" className="flex items-center gap-2 text-sm font-medium text-slate-900">
+            <ShieldCheck size={16} />
+            Already wrote an RTI? Check it like a PIO
+          </h2>
+          <p className="text-[13px] text-slate-600">
+            Paste any RTI application. RTI Copilot reads it the way a reluctant Public Information
+            Officer would, scores it out of 10 on fixed checks from the RTI Act, shows what the
+            officer could use to refuse it, and suggests a safer version you can check word by word.
+          </p>
+          <button
+            type="button"
+            onClick={onReview}
+            className="inline-flex w-fit items-center gap-1 text-[13px] font-medium text-blue-700 underline"
+          >
+            Check an application
+            <ArrowRight size={13} />
+          </button>
+        </section>
+      )}
 
       <section aria-labelledby="problems-heading" className="flex flex-col gap-3">
         <h2 id="problems-heading" className="text-sm font-medium text-slate-900">

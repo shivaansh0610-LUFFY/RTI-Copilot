@@ -84,3 +84,15 @@ test("the home page's inspection link leads to a suggested inspection offer", as
   fireEvent.click(screen.getByRole("button", { name: /ask to inspect the work/i }));
   expect(screen.getByText("Inspection added")).toBeTruthy();
 });
+
+test("'Check my draft' and the header both open the PIO review page, which keeps the pasted text", () => {
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: /check my draft/i }));
+  expect(screen.getByRole("heading", { name: "Check an RTI application" })).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Your application"), { target: { value: "1. Copy of the work order" } });
+
+  fireEvent.click(screen.getByRole("button", { name: "RTI Copilot" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check a draft" }));
+  expect((screen.getByLabelText("Your application") as HTMLTextAreaElement).value).toBe("1. Copy of the work order");
+});

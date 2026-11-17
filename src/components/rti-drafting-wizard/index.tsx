@@ -41,6 +41,9 @@ import { PrimaryButton, SecondaryButton } from "./ui";
 
 // A follow-up starts at the Requests step: the grievance and clarification are
 // already known from the original application.
+// The RTI Online portal's limit on the application text (backend: PORTAL_CHAR_LIMIT).
+const PORTAL_CHAR_LIMIT = 3000;
+
 export default function RtiDraftingWizard({
   followUp,
   starter,
@@ -207,6 +210,20 @@ export default function RtiDraftingWizard({
       .finally(() => setIsLoading(false));
   }
 
+  // The PIO review's improved version replaces the draft (and the copy kept in My RTIs).
+  function useImprovedDraft(text: string) {
+    if (!draft) return;
+    const overLimit = text.length > PORTAL_CHAR_LIMIT;
+    setDraft({
+      ...draft,
+      draftText: text,
+      charCount: text.length,
+      overLimit,
+      warning: overLimit ? draft.warning : undefined,
+    });
+    onDraftReady?.({ caseId, requests, grievance, draftText: text });
+  }
+
   // Every server call ends in .finally, so a failed one can never leave the spinner (and the
   // disabled Back and Continue buttons) on for good.
   function requestDraft(toDraft: InformationRequest[], draftLanguage: DraftLanguage) {
@@ -339,6 +356,7 @@ export default function RtiDraftingWizard({
               language={language}
               onLanguageChange={(next) => requestDraft(requests, next)}
               isUpdating={isLoading}
+              onUseText={useImprovedDraft}
             />
           )}
 
