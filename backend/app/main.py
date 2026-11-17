@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.routers import cases, drafting, geocode, responses
-from app.services import embeddings
+from app.services import embeddings, pwd_road_projects
 
 
 @asynccontextmanager
@@ -17,6 +17,9 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     if settings.use_corpus_citations and settings.use_llm_drafting:
         # Loading the embedding model takes a while; do it now, off the request path.
         threading.Thread(target=embeddings.warm_up, name="embedding-warm-up", daemon=True).start()
+    if settings.use_public_info_lookup:
+        # Reading the road categories of the live PWD feed takes ~15 s; do it now too.
+        threading.Thread(target=pwd_road_projects.warm_up, name="pwd-projects-warm-up", daemon=True).start()
     yield
 
 

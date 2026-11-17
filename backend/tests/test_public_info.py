@@ -4,9 +4,10 @@ from sqlalchemy import select
 
 from app.models import Document, Passage, Source
 from app.schemas import InformationRequest
-from app.services import live_fetch, public_info
+from app.services import live_fetch, public_info, pwd_road_projects
 from app.services.live_sources import LiveSource
 from app.services.pwd_road_projects import RoadProject
+from app.services.pwd_road_projects import fetch_projects_for as REAL_FETCH_PROJECTS_FOR
 
 
 @pytest.fixture(autouse=True)
@@ -15,10 +16,10 @@ def _no_live_road_projects_by_default(monkeypatch):
     network call to the live PWD road-projects feed. Tests that specifically cover that
     path override this stub themselves."""
 
-    def unreachable():
+    def unreachable(text):
         raise public_info.pwd_road_projects.RoadProjectsFetchError("not called in this test")
 
-    monkeypatch.setattr(public_info.pwd_road_projects, "fetch_road_projects", unreachable)
+    monkeypatch.setattr(public_info.pwd_road_projects, "fetch_projects_for", unreachable)
 
 
 @pytest.fixture(autouse=True)
@@ -234,7 +235,7 @@ def test_a_status_request_never_queries_the_static_corpus(monkeypatch):
     assert result.publicly_available is False
 
 
-# --- records requests: checked live against the PWD road-projects feed, before the corpus -----
+# --- records requests: checked live against the PWD Work Report feed, before the corpus --------
 
 
 def test_a_records_request_matching_a_live_project_is_marked_public(monkeypatch):
@@ -249,7 +250,7 @@ def test_a_records_request_matching_a_live_project_is_marked_public(monkeypatch)
         status="working",
         tender_status="awarded",
     )
-    monkeypatch.setattr(public_info.pwd_road_projects, "fetch_road_projects", lambda: [project])
+    monkeypatch.setattr(public_info.pwd_road_projects, "fetch_projects_for", lambda text: [project])
 
     request = REQUEST.model_copy(update={"title": "Manholes on Guru Ravidass Road"})
     result = public_info.check_public_info([request])[0]
@@ -262,11 +263,50 @@ def test_a_records_request_matching_a_live_project_is_marked_public(monkeypatch)
     assert "Project ID PWD-138317" in result.public_source.title
 
 
+def test_a_request_is_checked_against_the_categories_it_is_about(monkeypatch):
+    asked = []
+
+    def fake_category(category_id):
+        asked.append(category_id)
+        return []
+
+    # The autouse stub replaced fetch_projects_for; put the real one back to see which
+    # categories it asks for.
+    monkeypatch.setattr(public_info.pwd_road_projects, "fetch_projects_for", REAL_FETCH_PROJECTS_FOR)
+    monkeypatch.setattr(public_info.pwd_road_projects, "fetch_category_projects", fake_category)
+
+    request = REQUEST.model_copy(update={"title": "Work order for desilting of the drain near Vikas Marg"})
+    public_info._live_road_project_source(request.title)
+
+    assert pwd_road_projects.DESILTING in asked  # drain
+    assert pwd_road_projects.ROAD in asked  # Vikas Marg
+    assert len(asked) == len(set(asked))
+
+
+def test_a_project_in_a_non_road_category_can_match(monkeypatch):
+    streetlights = RoadProject(
+        id=9,
+        project_id="PWD-9",
+        name="Annual maintenance of streetlights and high masts on Ring Road",
+        status="working",
+        tender_status="awarded",
+    )
+    monkeypatch.setattr(
+        public_info.pwd_road_projects, "fetch_projects_for", lambda text: [streetlights]
+    )
+
+    request = REQUEST.model_copy(update={"title": "Maintenance of streetlights on Ring Road"})
+    result = public_info.check_public_info([request])[0]
+
+    assert result.publicly_available is True
+    assert "PWD-9" in result.public_source.title
+
+
 def test_a_records_request_not_in_the_live_feed_falls_back_to_the_corpus(monkeypatch):
     project = RoadProject(
         id=1, project_id="PWD-1", name="Guru Ravidass Road works", status="working", tender_status="awarded"
     )
-    monkeypatch.setattr(public_info.pwd_road_projects, "fetch_road_projects", lambda: [project])
+    monkeypatch.setattr(public_info.pwd_road_projects, "fetch_projects_for", lambda text: [project])
     with database_session("sqlite") as session:
         stub_keyword_statement(monkeypatch, {})
 

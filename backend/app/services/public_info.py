@@ -21,10 +21,12 @@ so "not found" there is not proof a complaint doesn't exist, only that this
 one live source doesn't show it.
 
 A records request (a work order, a tender) is checked first against the live
-PWD Delhi road-maintenance project feed (app.services.pwd_road_projects) —
-the kind of current, project-specific record the static corpus never held in
-the first place — before falling back to the static corpus, which mostly
-answers law-and-procedure questions instead.
+PWD Delhi Work Report feed (app.services.pwd_road_projects) — the kind of
+current, project-specific record the static corpus never held in the first
+place — before falling back to the static corpus, which mostly answers
+law-and-procedure questions instead. Which part of the feed is read follows
+the request: "road" reads the road categories, "drain" the drainage ones, and
+so on, every page of each.
 """
 
 import logging
@@ -103,17 +105,18 @@ def _has_pwd_row(text: str) -> bool:
 
 
 def _live_road_project_source(title: str) -> _PublicSourceRef | None:
-    """A live PWD Delhi road-maintenance project whose name mentions every significant word
-    of the request title (e.g. a road name), straight from the department's own Work Report
-    feed (app.services.pwd_road_projects) -- not pre-ingested, asked fresh every time. A
-    fetch failure is skipped, not raised, same as the status check above."""
+    """A live PWD Delhi project whose name mentions every significant word of the request
+    title (e.g. a road name), straight from the department's own Work Report feed
+    (app.services.pwd_road_projects) -- not pre-ingested, asked fresh every time (bar a few
+    minutes of memory). Only the categories the request is about are read, all their pages.
+    A fetch failure is skipped, not raised, same as the status check above."""
     words = _title_words(title)
     if not words:
         return None
     try:
-        projects = pwd_road_projects.fetch_road_projects()
+        projects = pwd_road_projects.fetch_projects_for(title)
     except pwd_road_projects.RoadProjectsFetchError:
-        logger.warning("PWD road-projects feed unreachable, skipping", exc_info=True)
+        logger.warning("PWD projects feed unreachable, skipping", exc_info=True)
         return None
     for project in projects:
         if words <= _title_words(project.searchable_text):
