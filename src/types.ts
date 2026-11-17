@@ -5,7 +5,8 @@ export interface InformationRequest {
   authority: string;
   period: string;
   quality: "good" | "needs-detail";
-  source?: "generated" | "custom" | "follow-up";
+  // "inspection": a Section 2(j) request to inspect the work or take samples, worded by the app.
+  source?: "generated" | "custom" | "follow-up" | "inspection";
   context?: string; // why this is being asked, e.g. what an earlier reply left out
   publiclyAvailable?: boolean;
   publicSource?: PublicSource; // where the information was found, when publiclyAvailable
@@ -38,6 +39,34 @@ export interface ClarifyResult {
 }
 
 export type DraftLanguage = "en" | "hi";
+
+// The officer check (POST /cases/:id/preflight). Mirrors app/schemas/preflight.py.
+export type PreflightCode =
+  | "QUESTION_NOT_RECORD"
+  | "CREATES_NEW_INFO"
+  | "TOO_VAGUE"
+  | "TOO_BROAD"
+  | "PERSONAL_INFO"
+  | "NO_PLACE";
+
+export interface PreflightIssue {
+  code: PreflightCode;
+  officerSays: string; // what a reluctant PIO could reply
+  why: string;
+  section: string; // e.g. "Section 2(f)"
+  fix: string;
+}
+
+export interface PreflightItem {
+  requestId: string;
+  issues: PreflightIssue[];
+  suggestedTitle?: string; // a better title from the AI, only when there are issues
+}
+
+export interface PreflightResult {
+  items: PreflightItem[];
+  aiUsed: boolean; // false when only the fixed rules ran
+}
 
 export interface DraftResult {
   draftText: string;

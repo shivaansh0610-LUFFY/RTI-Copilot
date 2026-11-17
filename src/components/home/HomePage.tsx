@@ -1,5 +1,35 @@
-import { ArrowRight, BookOpen, FileSearch, MapPin, Scale, type LucideIcon } from "lucide-react";
-import { PROBLEMS } from "./problems";
+import {
+  ArrowRight,
+  BookOpen,
+  Eye,
+  FileSearch,
+  Files,
+  FlaskConical,
+  Gavel,
+  MapPin,
+  Scale,
+  type LucideIcon,
+} from "lucide-react";
+import { PROBLEMS, REPAIR_STARTER } from "./problems";
+
+// Section 2(j) of the RTI Act: what a citizen can ask for.
+const RIGHTS: { icon: LucideIcon; title: string; text: string }[] = [
+  {
+    icon: Files,
+    title: "Copies of records",
+    text: "Work orders, bills, measurement books, inspection reports.",
+  },
+  {
+    icon: Eye,
+    title: "Inspect the work",
+    text: "See the road work and its files yourself, with an official.",
+  },
+  {
+    icon: FlaskConical,
+    title: "Certified samples",
+    text: "Take sealed samples of the material actually used.",
+  },
+];
 
 const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
   {
@@ -11,6 +41,11 @@ const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
     icon: BookOpen,
     title: "Get a precise RTI application",
     text: "The AI asks for the exact records PWD must keep, citing the CPWD Works Manual, in English or Hindi.",
+  },
+  {
+    icon: Gavel,
+    title: "Pass the officer check",
+    text: "We read your application the way a reluctant officer would, and help you fix every easy excuse to refuse it.",
   },
   {
     icon: FileSearch,
@@ -76,6 +111,40 @@ export default function HomePage({
             </button>
           ))}
         </div>
+      </section>
+
+      <section
+        aria-labelledby="rights-heading"
+        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:p-5"
+      >
+        <div className="flex flex-col gap-1">
+          <h2 id="rights-heading" className="text-sm font-medium text-slate-900">
+            RTI is more than photocopies
+          </h2>
+          <p className="text-[13px] text-slate-600">
+            Section 2(j) of the Act lets you ask for all three. Papers can say anything; the road
+            can&apos;t.
+          </p>
+        </div>
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {RIGHTS.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex items-start gap-2 rounded-md bg-slate-50 p-3">
+              <Icon size={16} className="mt-0.5 shrink-0 text-emerald-700" />
+              <span>
+                <span className="block text-sm font-medium text-slate-900">{title}</span>
+                <span className="block text-[13px] text-slate-600">{text}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => onStart(REPAIR_STARTER)}
+          className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-emerald-800 underline-offset-2 hover:underline"
+        >
+          A repair broke again? Start with an inspection
+          <ArrowRight size={14} />
+        </button>
       </section>
 
       <section aria-labelledby="how-heading" className="flex flex-col gap-3">

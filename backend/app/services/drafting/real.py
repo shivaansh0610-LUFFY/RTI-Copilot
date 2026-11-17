@@ -231,6 +231,9 @@ certified copy, a figure, a date, a report) for the stated period. Keep each req
 meaning; make it precise, never vaguer. Never ask "why". If a request says which \
 document the record is kept under, you may say so, naming that document exactly as given \
 (no paragraph numbers).
+- A request to inspect the work or records, or to take certified samples of material, \
+is a right under Section 2(j) of the Act: keep it as an inspection or sample request with \
+its section, and never turn it into a request for copies.
 - Close by asking that, if any information is held by another public authority, the \
 application be transferred under Section 6(3) of the Act.
 

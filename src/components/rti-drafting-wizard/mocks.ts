@@ -1,10 +1,17 @@
-import type { ClarifyResult, DraftLanguage, DraftResult, InformationRequest } from "../../types";
+import type {
+  ClarifyResult,
+  DraftLanguage,
+  DraftResult,
+  InformationRequest,
+  PreflightResult,
+} from "../../types";
 import { PERIOD_OPTIONS } from "./constants";
+import { checkLocally } from "./preflight";
 
 // Backend calls — each is a single async function. The ones still mocked are a
 // one-line swap for a real API call later: replace the body, keep the signature.
 
-const DEFAULT_AUTHORITY = "Public Works Department (PWD), Ward Division Office";
+export const DEFAULT_AUTHORITY = "Public Works Department (PWD), Ward Division Office";
 
 // Unset means "run on the built-in mock data without the backend".
 const API_URL: string | undefined = import.meta.env.VITE_API_URL;
@@ -114,6 +121,17 @@ export async function createCustomRequest(
     quality: wordCount >= 6 ? "good" : "needs-detail",
     source: "custom",
   };
+}
+
+// POST /cases/:id/preflight: the officer check. Without a backend, the same fixed rules run here.
+export async function runPreflight(
+  requests: InformationRequest[],
+  caseId: string | undefined,
+): Promise<PreflightResult> {
+  if (API_URL && caseId) {
+    return postJson<PreflightResult>(`/cases/${caseId}/preflight`, { requests });
+  }
+  return checkLocally(requests);
 }
 
 // POST /cases/:id/draft. The built-in mock ignores `language` and writes English.
