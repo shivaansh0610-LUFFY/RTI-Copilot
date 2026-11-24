@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { COLLAGE, PHOTOS, SLIDES, type Photo } from "./photos";
+import { PROBLEMS } from "./problems";
 
 const LICENSES = ["CC BY 2.0", "CC BY 3.0", "CC BY-SA 3.0", "CC BY-SA 4.0", "CC0", "GODL-India"];
 
@@ -14,9 +15,14 @@ describe("home page photos", () => {
     expect(photo.alt.trim()).not.toBe("");
   });
 
-  test("no photo appears twice in the slideshow and the collage", () => {
-    const used = [...SLIDES.map((s) => s.photo.src), ...COLLAGE.map((c) => c.photo.src)];
+  test("every photo is on the page exactly once", () => {
+    const used = [
+      ...SLIDES.map((s) => s.photo.src),
+      ...COLLAGE.map((c) => c.photo.src),
+      ...PROBLEMS.map((p) => p.polaroid.photo.src),
+    ];
     expect(new Set(used).size).toBe(used.length);
+    expect([...used].sort()).toEqual(Object.values(PHOTOS).map((p) => p.src).sort());
   });
 
   test("no two photos are the same file", () => {
