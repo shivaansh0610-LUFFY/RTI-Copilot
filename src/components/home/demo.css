@@ -1,0 +1,606 @@
+/* The application sheet, at rest and while the demo plays on it. */
+.sheet {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: clamp(300px, 26vw, 360px);
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid #e4d9c3;
+  background: #fff;
+  box-shadow:
+    0 2px 0 #ece3d1,
+    0 24px 50px rgba(28, 25, 23, 0.16);
+  transform: rotate(-2deg);
+  transition:
+    transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.6s ease;
+}
+
+/* Playing, the sheet straightens up and comes forward a little. */
+.sheet.is-active {
+  transform: rotate(0deg) scale(1.03);
+  box-shadow:
+    0 2px 0 #ece3d1,
+    0 30px 70px rgba(28, 25, 23, 0.22);
+}
+
+.sheet-letter {
+  padding: 26px 24px;
+  font-family: var(--font-serif);
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: #6e6862;
+}
+
+.sheet-letter p + p {
+  margin-top: 4px;
+}
+
+.sheet-letter p:nth-child(2),
+.sheet-letter p:nth-child(3) {
+  margin-top: 10px;
+}
+
+.sheet-letter-subject {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sheet-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink-blue);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(31, 58, 138, 0.4);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.sheet-play:hover {
+  background: var(--ink-blue-deep);
+  transform: scale(1.06);
+}
+
+/* The play triangle sits a little right of centre to look centred. */
+.sheet-play svg {
+  margin-left: 4px;
+}
+
+/* A slow ring around the play button, to say it can be pressed. */
+.sheet-play::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border: 2px solid var(--ink-blue);
+  border-radius: 50%;
+  opacity: 0;
+  animation: sheet-pulse 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes sheet-pulse {
+  from {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+.sheet-replay svg {
+  margin-left: 0;
+}
+
+.sheet-replay::after {
+  display: none;
+}
+
+/* At the end the last scene dims behind the replay button. */
+.sheet.is-done .demo-stage {
+  opacity: 0.35;
+  transition: opacity 0.4s ease;
+}
+
+/* The demo itself. */
+.demo-stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 18px 8px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.demo-chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 3px 9px 2px 3px;
+  border-radius: 999px;
+  background: var(--paper-warm);
+  color: var(--brown);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.demo-chip span {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--ink-blue);
+  color: #fff;
+  letter-spacing: 0;
+}
+
+.demo-scene {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  margin-top: 12px;
+  animation: demo-in 0.5s ease both;
+}
+
+@keyframes demo-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.demo-label {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.demo-reveal {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s ease;
+}
+
+.demo-reveal.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+/* 1. Describe it */
+.demo-field {
+  min-height: 92px;
+  padding: 10px 11px;
+  border: 1.5px solid var(--ink-blue);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.demo-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1.1em;
+  margin-left: 1px;
+  background: var(--ink-blue);
+  vertical-align: -0.15em;
+  animation: demo-blink 1s steps(1) infinite;
+}
+
+@keyframes demo-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.demo-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.demo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid #d3c5a8;
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 11.5px;
+  color: var(--ink);
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.demo-pill.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+.demo-pill svg {
+  flex: none;
+  color: var(--ink-blue);
+}
+
+.demo-pill + .demo-pill svg {
+  color: var(--stamp);
+}
+
+.demo-button {
+  align-self: flex-end;
+  margin-top: auto;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--ink-blue);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  opacity: 0;
+  transition:
+    opacity 0.35s ease,
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.demo-button.is-shown {
+  opacity: 1;
+}
+
+.demo-button.is-pressed {
+  background: var(--ink-blue-deep);
+  transform: scale(0.94);
+}
+
+/* 2. Ask precisely */
+.demo-letter-head {
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.demo-letter-intro {
+  margin-top: -6px;
+  font-family: var(--font-serif);
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.demo-requests {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-family: var(--font-serif);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.demo-requests li {
+  display: flex;
+  gap: 6px;
+}
+
+.demo-n {
+  flex: none;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink-blue);
+}
+
+.demo-cite {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: #e8eefb;
+  color: var(--ink-blue);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.demo-cite.is-shown {
+  opacity: 1;
+}
+
+.demo-languages {
+  display: flex;
+  align-self: flex-start;
+  gap: 2px;
+  margin-top: auto;
+  padding: 2px;
+  border: 1px solid #d3c5a8;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.demo-languages span {
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.demo-languages .is-on {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* 3. Officer check */
+.demo-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.demo-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #8a8178;
+  transition: color 0.3s ease;
+}
+
+.demo-checks li.is-ticked {
+  color: var(--ink);
+}
+
+.demo-tick {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border: 1.5px solid #c8bfae;
+  border-radius: 50%;
+  color: transparent;
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.is-ticked .demo-tick {
+  border-color: #15803d;
+  background: #15803d;
+  color: #fff;
+  animation: demo-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes demo-pop {
+  from {
+    transform: scale(0.4);
+  }
+}
+
+.demo-checks li.demo-more {
+  padding-left: 23px;
+  font-style: italic;
+  color: var(--ink-3);
+}
+
+.demo-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding: 10px 6px 0 0;
+  border-top: 1px dashed #c8b993;
+  font-size: 12px;
+}
+
+.demo-score strong {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink-blue);
+}
+
+.demo-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 9px 4px;
+  border: 2.5px solid var(--stamp);
+  border-radius: 6px;
+  color: var(--stamp);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  line-height: 1.1;
+  opacity: 0;
+  transform: rotate(-8deg) scale(1.8);
+  mix-blend-mode: multiply;
+  transition:
+    opacity 0.15s ease,
+    transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.demo-stamp.is-shown {
+  opacity: 1;
+  transform: rotate(-8deg) scale(1);
+}
+
+.demo-stamp span:first-child {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+}
+
+.demo-stamp span:last-child {
+  font-size: 18px;
+}
+
+/* 4. Check the reply */
+.demo-findings {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+}
+
+.demo-findings li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #efe7d8;
+  color: var(--ink);
+}
+
+.demo-badge {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.demo-badge.is-good {
+  background: #ecfdf3;
+  color: #146c37;
+}
+
+.demo-badge.is-part {
+  background: #fff4e0;
+  color: #8a4b08;
+}
+
+.demo-badge.is-bad {
+  background: #fef3f2;
+  color: var(--stamp);
+}
+
+.demo-appeal {
+  align-self: stretch;
+  text-align: center;
+}
+
+.demo-note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: center;
+  color: var(--brown);
+}
+
+/* The controls under the demo. */
+.demo-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid #efe7d8;
+  background: var(--card);
+}
+
+.demo-icon-btn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.demo-icon-btn:hover {
+  background: var(--paper-warm);
+}
+
+.demo-segments {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+}
+
+.demo-segment {
+  position: relative;
+  flex: 1;
+  height: 28px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.demo-segment::before,
+.demo-segment span {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 2px;
+}
+
+.demo-segment::before {
+  background: #e6dccb;
+}
+
+.demo-segment span {
+  background: var(--ink-blue);
+  transform-origin: 0 50%;
+  transition: transform 60ms linear;
+}
+
+.demo-segment:hover::before {
+  background: #d3c5a8;
+}
+
+.demo-time {
+  min-width: 30px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+  color: var(--ink-3);
+}
+
+/* On a phone the sheet has the width to itself. */
+@media (max-width: 640px) {
+  .sheet {
+    width: min(86vw, 340px);
+  }
+}

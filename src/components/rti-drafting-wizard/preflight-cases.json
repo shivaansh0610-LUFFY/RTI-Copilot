@@ -1,0 +1,23 @@
+[
+  { "title": "Copy of the work order sanctioning repair of the road at the above location", "codes": [] },
+  { "title": "Copies of the measurement book entries and bills paid for the latest repair of this road", "codes": [] },
+  { "title": "Why has the road outside my house not been repaired for two years?", "codes": ["QUESTION_NOT_RECORD"] },
+  { "title": "Please explain the reasons for the delay in repairing the road", "codes": ["QUESTION_NOT_RECORD"] },
+  { "title": "Copies of the file notings explaining why the repair work was stopped", "codes": [] },
+  { "title": "When will the PWD repair the potholes on this road?", "codes": ["CREATES_NEW_INFO"] },
+  { "title": "Whether the quality of the material used on this road was correct", "codes": ["CREATES_NEW_INFO"] },
+  { "title": "Details of amount spent", "codes": ["TOO_VAGUE"] },
+  { "title": "Copy of the inspection report for the road near the market", "quality": "needs-detail", "codes": ["TOO_VAGUE"] },
+  { "title": "Copies of all records relating to every road repaired by PWD", "codes": ["TOO_BROAD"] },
+  { "title": "List of potholes repaired across Delhi by the division", "codes": ["TOO_BROAD"] },
+  { "title": "Home address and mobile number of the junior engineer in charge of this road", "codes": ["PERSONAL_INFO"] },
+  { "title": "Income tax returns of the contractor who repaired this road", "codes": ["PERSONAL_INFO"] },
+  { "title": "Why was it done", "codes": ["QUESTION_NOT_RECORD", "TOO_VAGUE"] },
+  { "title": "Name of the contractor firm and the acres of land acquired across the stretch", "codes": [] },
+  {
+    "title": "Inspection of the road work and its records, under Section 2(j)(i) of the RTI Act",
+    "source": "inspection",
+    "codes": []
+  },
+  { "title": "Why", "source": "inspection", "codes": [] }
+]

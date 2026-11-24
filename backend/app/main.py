@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import cases, drafting, geocode, responses
+from app.routers import cases, drafting, geocode, responses, review
 from app.services import embeddings, pwd_road_projects
 
 
@@ -36,6 +36,7 @@ app.include_router(cases.router)
 app.include_router(drafting.router)
 app.include_router(geocode.router)
 app.include_router(responses.router)
+app.include_router(review.router)
 
 
 @app.get("/health")

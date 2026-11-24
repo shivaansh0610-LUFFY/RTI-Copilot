@@ -78,9 +78,17 @@ The whole RTI loop runs end to end, for road grievances against PWD Delhi:
    with the line of the reply it rests on, or "insufficient evidence" when it is unclear.
 6. **First appeal**: a Section 19(1) appeal drafted from those findings.
 
-Around it: a home page with the problems PWD handles, **My RTIs** (every draft kept in the
-browser, with the reply due date and the appeal window once the filing date is entered), and
-print / save as PDF for the draft and the appeal. Inputs are size-limited on the API.
+Around it: a home page that tells the story in chapters (a slideshow of road problems and
+the record that answers each, the five records Section 2(j) lets you ask for, a 30-second demo
+that plays on the application sheet, and the problems PWD handles to start from), **My RTIs**
+(every draft kept in the browser, with the reply due date and the appeal window once the
+filing date is entered), and print / save as PDF for the draft and the appeal. Inputs are
+size-limited on the API.
+
+The home page's photos come from Wikimedia Commons under CC BY, CC BY-SA, CC0 and GODL-India;
+each is credited in the page footer, from `src/components/home/photos.ts`, which a test keeps
+complete. Its fonts (Khand, Kalam, IBM Plex, Noto Serif; SIL Open Font License) are bundled
+with the app through `@fontsource`, so no font service is called.
 
 The AI runs on Groq (`USE_LLM_DRAFTING`); without it every step falls back to templates and
 says so, never to invented content. `demo/DEMO.md` is a five-minute demo script, and

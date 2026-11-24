@@ -1,0 +1,191 @@
+/* The home page as a story told in chapters: paper, ink blue and a red rubber stamp.
+   Each section's own styles sit next to its component; this file holds what they share. */
+
+.story {
+  --paper: #f6f1e7;
+  --paper-light: #fbf8f2;
+  --paper-warm: #f3ede2;
+  --paper-deep: #ede5d3;
+  --card: #fffdf8;
+  --line: #e0d5be;
+  --ink: #1c1917;
+  --ink-2: #2e2a26;
+  --ink-3: #4a4540;
+  --ink-blue: #1f3a8a;
+  --ink-blue-deep: #13245a;
+  --khaki: #c9a66b;
+  --brown: #6b5330;
+  --stamp: #b42318;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-serif: "Noto Serif", Georgia, serif;
+  --font-title: "Khand", "IBM Plex Sans", system-ui, sans-serif;
+  --font-hand: "Kalam", "Comic Sans MS", cursive;
+  --gutter: clamp(16px, 2.5vw, 32px);
+
+  flex: 1;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+.story strong {
+  font-weight: 600;
+}
+
+.story-wrap {
+  max-width: 1376px;
+  margin: 0 auto;
+  padding-inline: var(--gutter);
+}
+
+/* One look for every keyboard focus on the page: a thick ink-blue ring. */
+.story :focus-visible {
+  outline: 3px solid var(--ink-blue);
+  outline-offset: 3px;
+}
+
+/* How far the page has been read, as a line across the top. Only drawn while the scroll
+   motion runs, which sets --progress. */
+.story-progress {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 1001;
+  height: 3px;
+  background: var(--ink-blue);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+.story-disclaimer {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-deep);
+}
+
+.story-disclaimer p {
+  padding-block: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #3b3733;
+}
+
+/* Chapter numbers and titles. */
+.story-num {
+  font-family: var(--font-title);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--brown);
+}
+
+.story-title {
+  margin-top: 6px;
+  font-family: var(--font-title);
+  font-weight: 700;
+  line-height: 0.92;
+  text-transform: uppercase;
+}
+
+.story-hand {
+  font-family: var(--font-hand);
+  font-weight: 400;
+}
+
+/* Sections fade up as they first scroll into view (see motion.ts). Nothing is hidden until
+   the page is armed, so without JavaScript or the observer everything simply shows. */
+.story.is-armed [data-reveal] {
+  transition:
+    opacity 0.9s ease,
+    transform 0.9s ease;
+}
+
+.story.is-armed [data-reveal]:not(.is-in) {
+  opacity: 0;
+  transform: translateY(32px);
+}
+
+/* The buttons the page shares. */
+.story-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.story-btn:active {
+  transform: translateY(1px);
+}
+
+.story-btn-ink {
+  background: var(--ink-blue);
+  color: #fff;
+}
+
+.story-btn-ink:hover {
+  background: var(--ink-blue-deep);
+}
+
+.story-btn-line {
+  border-color: var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.story-btn-line:hover {
+  background: rgba(28, 25, 23, 0.06);
+}
+
+/* A text link that may wrap: inline, so its arrow follows the last word. */
+.story-link {
+  display: inline-block;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--ink-blue);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.story-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Keeps an arrow on the same line as the word before it. */
+.story-nowrap {
+  white-space: nowrap;
+}
+
+.story-link svg {
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: -3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story *,
+  .story *::before,
+  .story *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

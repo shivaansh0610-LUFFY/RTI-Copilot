@@ -1,4 +1,4 @@
-import { Check, FilePenLine, FileSearch, ListChecks, Scale, type LucideIcon } from "lucide-react";
+import { Check, FilePenLine, FileSearch, ListChecks, Scale, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 // The pieces every page shares, in the style of the home page: one width, one header, one
@@ -100,10 +100,11 @@ export function StepProgress({
   );
 }
 
-export type View = "home" | "drafting" | "analysis" | "rtis";
+export type View = "home" | "drafting" | "review" | "analysis" | "rtis";
 
 const NAV: { view: Exclude<View, "home">; icon: LucideIcon; short: string; full: string }[] = [
   { view: "drafting", icon: FilePenLine, short: "Draft", full: "Draft your RTI" },
+  { view: "review", icon: ShieldCheck, short: "Check", full: "Check a draft" },
   { view: "analysis", icon: FileSearch, short: "Reply", full: "Analyse the reply" },
   { view: "rtis", icon: ListChecks, short: "My RTIs", full: "My RTIs" },
 ];
@@ -128,7 +129,7 @@ export function SiteHeader({
           <Scale size={16} />
           RTI Copilot
         </button>
-        <nav aria-label="Main" className="flex gap-1">
+        <nav aria-label="Main" className="flex gap-0.5 sm:gap-1">
           {NAV.map(({ view: target, icon: Icon, short, full }) => {
             const count = target === "rtis" && rtiCount > 0 ? ` (${rtiCount})` : "";
             const active = view === target;
@@ -140,7 +141,7 @@ export function SiteHeader({
                 aria-label={full + count}
                 aria-current={active ? "page" : undefined}
                 className={
-                  "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium sm:px-3 " +
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-[13px] font-medium sm:px-3 sm:text-sm " +
                   (active ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100")
                 }
               >

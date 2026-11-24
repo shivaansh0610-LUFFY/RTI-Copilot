@@ -6,6 +6,8 @@ from app.config import get_settings
 from app.models import Case
 from app.routers.cases import CaseDep, SessionDep
 from app.schemas import ClarifyResult, DecomposeBody, DraftBody, DraftResponse, InformationRequest, RequestsBody
+from app.schemas.preflight import PreflightResult
+from app.services import preflight
 from app.services.drafting import mock, real
 from app.services.drafting.specificity import is_vague
 
@@ -61,6 +63,13 @@ def public_info_check(case: CaseDep, session: SessionDep, body: RequestsBody) ->
     checked = check_public_info(body.requests)
     _save_requests(case, checked, session)
     return checked
+
+
+@router.post("/preflight", response_model=PreflightResult, response_model_exclude_none=True)
+def preflight_check(case: CaseDep, body: RequestsBody) -> PreflightResult:
+    """The officer check: the excuses a reluctant PIO could use against each request. Changes
+    nothing; the citizen decides what to fix before the draft."""
+    return preflight.check_requests(case.grievance_text, body.requests, use_ai=get_settings().use_llm_drafting)
 
 
 @router.post("/draft", response_model=DraftResponse, response_model_exclude_none=True)

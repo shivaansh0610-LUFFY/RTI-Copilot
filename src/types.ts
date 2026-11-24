@@ -5,7 +5,8 @@ export interface InformationRequest {
   authority: string;
   period: string;
   quality: "good" | "needs-detail";
-  source?: "generated" | "custom" | "follow-up";
+  // "inspection": a Section 2(j) request to inspect the work or take samples, worded by the app.
+  source?: "generated" | "custom" | "follow-up" | "inspection";
   context?: string; // why this is being asked, e.g. what an earlier reply left out
   publiclyAvailable?: boolean;
   publicSource?: PublicSource; // where the information was found, when publiclyAvailable
@@ -42,7 +43,35 @@ export interface ClarifyResult {
 
 export type DraftLanguage = "en" | "hi";
 
-// Collected after Requests (and Quality review, if shown) so the printed letter's "To the PIO"
+// The officer check (POST /cases/:id/preflight). Mirrors app/schemas/preflight.py.
+export type PreflightCode =
+  | "QUESTION_NOT_RECORD"
+  | "CREATES_NEW_INFO"
+  | "TOO_VAGUE"
+  | "TOO_BROAD"
+  | "PERSONAL_INFO"
+  | "NO_PLACE";
+
+export interface PreflightIssue {
+  code: PreflightCode;
+  officerSays: string; // what a reluctant PIO could reply
+  why: string;
+  section: string; // e.g. "Section 2(f)"
+  fix: string;
+}
+
+export interface PreflightItem {
+  requestId: string;
+  issues: PreflightIssue[];
+  suggestedTitle?: string; // a better title from the AI, only when there are issues
+}
+
+export interface PreflightResult {
+  items: PreflightItem[];
+  aiUsed: boolean; // false when only the fixed rules ran
+}
+
+// Collected after the officer check so the printed letter's "To the PIO"
 // particulars arrive filled in rather than left blank for the citizen to write by hand. Only the
 // PDF letter uses this -- the portal's own text box ("Copy draft") has its own such fields.
 export interface ApplicantDetails {
@@ -117,4 +146,43 @@ export interface ClassificationResult {
   explanation: string;
   evidence: ResponsePassage[];
   abstentionReason?: string; // required when label === "INSUFFICIENT_EVIDENCE"
+}
+
+// PIO review of a whole application (POST /review-draft). Mirrors backend/app/schemas/review.py.
+export interface ReviewPointNote {
+  point: number;
+  officerSays: string;
+}
+
+export interface ReviewCheck {
+  id: string;
+  label: string;
+  passed: boolean;
+  why?: string;
+  section?: string;
+  fix?: string;
+  notes: ReviewPointNote[];
+}
+
+// Something the AI, playing the officer, noticed about one point. Not part of the score.
+export interface ReviewAiNote {
+  point: number;
+  checkId: string;
+  officerSays: string;
+}
+
+export interface ImprovedDraft {
+  text: string;
+  score: number;
+  fixed: string[];
+}
+
+export interface DraftReview {
+  score: number;
+  outOf: number;
+  verdict: "ready" | "fix" | "weak";
+  checks: ReviewCheck[]; // fixed rules only: they make the score
+  aiNotes?: ReviewAiNote[];
+  improved?: ImprovedDraft;
+  aiUsed: boolean;
 }

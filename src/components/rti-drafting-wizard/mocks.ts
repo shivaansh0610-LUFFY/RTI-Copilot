@@ -1,10 +1,17 @@
-import type { ClarifyResult, DraftLanguage, DraftResult, InformationRequest } from "../../types";
+import type {
+  ClarifyResult,
+  DraftLanguage,
+  DraftResult,
+  InformationRequest,
+  PreflightResult,
+} from "../../types";
 import { MULTI_SELECT_SEPARATOR, PERIOD_OPTIONS, RECORD_TYPES_KEY } from "./constants";
+import { checkLocally } from "./preflight";
 
 // Backend calls — each is a single async function. The ones still mocked are a
 // one-line swap for a real API call later: replace the body, keep the signature.
 
-const DEFAULT_AUTHORITY = "Public Works Department (PWD), Ward Division Office";
+export const DEFAULT_AUTHORITY = "Public Works Department (PWD), Ward Division Office";
 
 // Matches RECORD_TYPE_REQUESTS in app/services/drafting/mock.py -- keep both in sync.
 const RECORD_TYPE_REQUESTS: Record<string, { category: string; title: string; quality: "good" | "needs-detail" }> = {
@@ -184,6 +191,17 @@ export async function createCustomRequest(
     quality: wordCount >= 6 ? "good" : "needs-detail",
     source: "custom",
   };
+}
+
+// POST /cases/:id/preflight: the officer check. Without a backend, the same fixed rules run here.
+export async function runPreflight(
+  requests: InformationRequest[],
+  caseId: string | undefined,
+): Promise<PreflightResult> {
+  if (API_URL && caseId) {
+    return postJson<PreflightResult>(`/cases/${caseId}/preflight`, { requests });
+  }
+  return checkLocally(requests);
 }
 
 // POST /cases/:id/draft. The built-in mock ignores `language` and writes English.

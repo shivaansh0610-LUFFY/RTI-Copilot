@@ -1,5 +1,5 @@
 import { ArrowRight, CornerDownRight, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   ApplicantDetails,
   ClarifyQuestion,
@@ -8,22 +8,27 @@ import type {
   FiledCase,
   FollowUpContext,
   InformationRequest,
+  PreflightResult,
 } from "../../types";
 import { ALL_STEPS, type StepId } from "./constants";
+import { inspectionRequest, suggestsInspection, type InspectionKind } from "./inspection";
 import { locationLine, withLocationLine, type IssueLocation } from "./location";
 import {
   createCase,
   createCustomRequest,
   decomposeGrievance,
+  DEFAULT_AUTHORITY,
   generateDraft,
   getClarifyQuestions,
+  runPreflight,
 } from "./mocks";
+import { qualityOf } from "./preflight";
 import {
   ApplicantDetailsStep,
   ClarifyStep,
   DescribeStep,
   DraftStep,
-  QualityReviewStep,
+  OfficerCheckStep,
   RequestsStep,
 } from "./steps";
 import {
@@ -38,6 +43,9 @@ import { PrimaryButton, SecondaryButton } from "./ui";
 
 // A follow-up starts at the Requests step: the grievance and clarification are
 // already known from the original application.
+// The RTI Online portal's limit on the application text (backend: PORTAL_CHAR_LIMIT).
+const PORTAL_CHAR_LIMIT = 3000;
+
 export default function RtiDraftingWizard({
   followUp,
   starter,
@@ -72,7 +80,10 @@ export default function RtiDraftingWizard({
 
   const [requests, setRequests] = useState<InformationRequest[]>(followUp?.requests ?? []);
   const [requestsError, setRequestsError] = useState("");
-  const [carriedRequests, setCarriedRequests] = useState<InformationRequest[]>([]);
+  // The officer check of `requests`, and whether their wording changed since.
+  const [preflight, setPreflight] = useState<PreflightResult | undefined>();
+  const [preflightStale, setPreflightStale] = useState(false);
+  const [preflightError, setPreflightError] = useState("");
   const [applicantDetails, setApplicantDetails] = useState<ApplicantDetails>({
     name: "",
     relation: "son",
@@ -89,21 +100,7 @@ export default function RtiDraftingWizard({
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // Before the requests step settles (quality-review or draft), there is no carriedRequests yet
-  // to check -- predict from the live requests instead, so the step list shown while still on
-  // Describe/Clarify/Requests already matches what Continue will actually do, instead of
-  // optimistically showing "Quality review" and then dropping it once it turns out not needed.
-  const needsQualityReview = useMemo(() => {
-    const checked = step === "quality-review" || step === "draft" ? carriedRequests : requests;
-    return checked.some((r) => r.quality === "needs-detail");
-  }, [step, requests, carriedRequests]);
-
-  const visibleSteps = useMemo(
-    () => ALL_STEPS.filter((s) => s.id !== "quality-review" || needsQualityReview),
-    [needsQualityReview],
-  );
-
-  const stepNumber = visibleSteps.findIndex((s) => s.id === step) + 1;
+  const stepNumber = ALL_STEPS.findIndex((s) => s.id === step) + 1;
 
   // A new step starts at its top; on a phone the Continue button is far down the previous one.
   useEffect(() => {
@@ -186,6 +183,58 @@ export default function RtiDraftingWizard({
     setRequests((prev) => prev.filter((r) => r.id !== id));
   }
 
+  function handleAddInspection(kind: InspectionKind) {
+    setRequests((prev) => {
+      const added = inspectionRequest(
+        kind,
+        prev[0]?.authority ?? followUp?.originalAuthority ?? DEFAULT_AUTHORITY,
+        clarificationAnswers.period ?? "Last 1 year",
+      );
+      return prev.some((r) => r.id === added.id) ? prev : [...prev, added];
+    });
+    setRequestsError("");
+  }
+
+  // A follow-up starts without a case on the server; it gets one here, so its officer check
+  // and draft use the backend too. Without a backend this stays undefined.
+  function ensureCase(): Promise<string | undefined> {
+    if (caseId) return Promise.resolve(caseId);
+    return createCase(grievance).then((newCaseId) => {
+      setCaseId(newCaseId);
+      return newCaseId;
+    });
+  }
+
+  function checkRequests(toCheck: InformationRequest[], checkCaseId: Promise<string | undefined>) {
+    setPreflightError("");
+    setIsLoading(true);
+    return checkCaseId
+      .then((id) => runPreflight(toCheck, id))
+      .then((result) => {
+        setPreflight(result);
+        setPreflightStale(false);
+      })
+      .catch(() => {
+        setPreflight(undefined);
+        setPreflightError("We couldn't run the officer check. Try again, or continue to the draft.");
+      })
+      .finally(() => setIsLoading(false));
+  }
+
+  // The PIO review's improved version replaces the draft (and the copy kept in My RTIs).
+  function useImprovedDraft(text: string) {
+    if (!draft) return;
+    const overLimit = text.length > PORTAL_CHAR_LIMIT;
+    setDraft({
+      ...draft,
+      draftText: text,
+      charCount: text.length,
+      overLimit,
+      warning: overLimit ? draft.warning : undefined,
+    });
+    onDraftReady?.({ caseId, requests, grievance, draftText: text });
+  }
+
   // Every server call ends in .finally, so a failed one can never leave the spinner (and the
   // disabled Back and Continue buttons) on for good.
   function requestDraft(toDraft: InformationRequest[], draftLanguage: DraftLanguage) {
@@ -210,15 +259,16 @@ export default function RtiDraftingWizard({
       return;
     }
     setRequestsError("");
-    setCarriedRequests(requests);
-    if (requests.some((r) => r.quality === "needs-detail")) {
-      setStep("quality-review");
-    } else {
-      setStep("applicant-details");
-    }
+    // The check step opens either way: with the findings, or with a "try again".
+    checkRequests(requests, ensureCase()).then(() => setStep("check"));
   }
 
-  function handleQualityReviewContinue() {
+  function handleCheckContinue() {
+    if (requests.some((r) => !r.title.trim())) {
+      setDraftError("Every request needs some wording. Write it, or go back and remove it.");
+      return;
+    }
+    setDraftError("");
     setStep("applicant-details");
   }
 
@@ -228,31 +278,38 @@ export default function RtiDraftingWizard({
       return;
     }
     setApplicantError("");
-    requestDraft(carriedRequests, language);
+    requestDraft(
+      requests.map((r) => ({ ...r, title: r.title.trim() })),
+      language,
+    );
   }
 
-  function updateCarriedRequestTitle(id: string, title: string) {
-    setCarriedRequests((prev) => prev.map((r) => (r.id === id ? { ...r, title } : r)));
+  function updateRequestTitle(id: string, title: string) {
+    setRequests((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, title, quality: qualityOf(title) } : r)),
+    );
+    setPreflightStale(true);
+    setDraftError("");
   }
 
   function goBack() {
     setDraftError("");
     if (step === "clarify") setStep("describe");
     else if (step === "requests") setStep("clarify");
-    else if (step === "quality-review") setStep("requests");
-    else if (step === "applicant-details") setStep(needsQualityReview ? "quality-review" : "requests");
+    else if (step === "check") setStep("requests");
+    else if (step === "applicant-details") setStep("check");
     else if (step === "draft") setStep("applicant-details");
   }
 
   return (
     <PageContainer>
       <PageHeader
-        eyebrow={`Step ${stepNumber} of ${visibleSteps.length} · ${stepLabel}`}
+        eyebrow={`Step ${stepNumber} of ${ALL_STEPS.length} · ${stepLabel}`}
         title={followUp ? "Draft your follow-up RTI" : "Draft your RTI application"}
         intro="Turn your complaint into an application that asks for the exact records PWD must keep."
       />
 
-      <StepProgress steps={visibleSteps} currentId={step} />
+      <StepProgress steps={ALL_STEPS} currentId={step} />
 
       {followUp && (
         <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 p-3">
@@ -294,16 +351,23 @@ export default function RtiDraftingWizard({
             <RequestsStep
               requests={requests}
               isFollowUp={Boolean(followUp)}
+              suggestInspection={suggestsInspection(grievance)}
               onAdd={handleAddRequest}
+              onAddInspection={handleAddInspection}
               onRemove={handleRemoveRequest}
               error={requestsError}
             />
           )}
 
-          {step === "quality-review" && (
-            <QualityReviewStep
-              requests={carriedRequests}
-              onTitleChange={updateCarriedRequestTitle}
+          {step === "check" && (
+            <OfficerCheckStep
+              requests={requests}
+              result={preflight}
+              isStale={preflightStale}
+              isChecking={isLoading}
+              error={preflightError}
+              onTitleChange={updateRequestTitle}
+              onRecheck={() => checkRequests(requests, ensureCase())}
             />
           )}
 
@@ -318,12 +382,13 @@ export default function RtiDraftingWizard({
           {step === "draft" && draft && (
             <DraftStep
               draft={draft}
-              requests={carriedRequests}
+              requests={requests}
               photos={photos}
               applicant={applicantDetails}
               language={language}
-              onLanguageChange={(next) => requestDraft(carriedRequests, next)}
+              onLanguageChange={(next) => requestDraft(requests, next)}
               isUpdating={isLoading}
+              onUseText={useImprovedDraft}
             />
           )}
 
@@ -353,8 +418,8 @@ export default function RtiDraftingWizard({
               Continue
             </PrimaryButton>
           )}
-          {step === "quality-review" && (
-            <PrimaryButton onClick={handleQualityReviewContinue} disabled={isLoading}>
+          {step === "check" && (
+            <PrimaryButton onClick={handleCheckContinue} disabled={isLoading}>
               {isLoading && <Loader2 size={14} className="animate-spin" />}
               Continue
             </PrimaryButton>

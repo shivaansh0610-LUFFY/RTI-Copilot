@@ -1,36 +1,45 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test } from "vitest";
 import App from "./App";
-import { PROBLEMS } from "./components/home/problems";
+import { PROBLEMS, REPAIR_STARTER } from "./components/home/problems";
 
 function description() {
   return screen.getByPlaceholderText(/The road in front of my house/) as HTMLTextAreaElement;
 }
 
+// The home page offers each way in twice, in the hero and again at the end: use the first.
+function homeButton(name: RegExp) {
+  return screen.getAllByRole("button", { name })[0];
+}
+
+function homeHeading() {
+  return screen.queryByRole("heading", { level: 1, name: "Complaint ignored? Make them answer." });
+}
+
 test("opens on the home page, and a problem tile starts the description", () => {
   render(<App />);
-  expect(screen.getByText("Complaint ignored? Make them answer.")).toBeTruthy();
+  expect(homeHeading()).toBeTruthy();
 
   fireEvent.click(screen.getByRole("button", { name: PROBLEMS[2].label }));
 
-  expect(screen.queryByText("Complaint ignored? Make them answer.")).toBeNull();
+  expect(homeHeading()).toBeNull();
   expect(description().value).toBe(PROBLEMS[2].starter);
 });
 
 test("the plain start button keeps a description already in progress", () => {
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: /start my rti/i }));
+  fireEvent.click(homeButton(/start my rti/i));
   fireEvent.change(description(), { target: { value: "My own words about the road." } });
 
   fireEvent.click(screen.getByRole("button", { name: "RTI Copilot" }));
-  fireEvent.click(screen.getByRole("button", { name: /start my rti/i }));
+  fireEvent.click(homeButton(/start my rti/i));
 
   expect(description().value).toBe("My own words about the road.");
 });
 
 test("'I got a reply' opens the reply analysis", () => {
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: /i got a reply/i }));
+  fireEvent.click(homeButton(/i got a reply/i));
 
   expect(screen.getByRole("heading", { name: "Analyse the reply" }).closest("[hidden]")).toBeNull();
 });
@@ -38,7 +47,7 @@ test("'I got a reply' opens the reply analysis", () => {
 test("a drafted application appears in My RTIs, and filing it shows the reply deadline", async () => {
   window.localStorage.clear();
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: /start my rti/i }));
+  fireEvent.click(homeButton(/start my rti/i));
   fireEvent.change(description(), { target: { value: "Big pothole on Ring Road. Nobody repairs it." } });
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
@@ -46,14 +55,15 @@ test("a drafted application appears in My RTIs, and filing it shows the reply de
   await screen.findByText("What time period does this relate to?");
   fireEvent.click(screen.getByRole("button", { name: "Last 6 months" }));
   fireEvent.click(screen.getByRole("button", { name: "No, not sure" }));
-  // Pick a type that stays "good" and one the mock marks "needs-detail", so the Quality review
-  // step below still has something to show.
+  // Pick a type that stays "good" and one the mock marks "needs-detail", so the officer check
+  // below has an excuse to show.
   fireEvent.click(screen.getByRole("button", { name: "Inspection report" }));
   fireEvent.click(screen.getByRole("button", { name: "Budget/expenditure details" }));
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
   await screen.findByText(/has been broken down/);
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
-  await screen.findByText(/could use more detail/);
+  // The demo's "Details of amount spent" is too vague: the officer check says so.
+  await screen.findByText("The officer could use an excuse on 1 of 2 requests.");
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
   // "Your details", for the printed letter's particulars.
@@ -72,4 +82,54 @@ test("a drafted application appears in My RTIs, and filing it shows the reply de
   fireEvent.change(screen.getByLabelText("Filed on"), { target: { value: today } });
   expect(screen.getByText(/Reply due by .* \(30 days left\)/)).toBeTruthy();
   expect(JSON.parse(window.localStorage.getItem("rti-copilot:my-rtis") ?? "[]")[0].filedOn).toBe(today);
+});
+
+test("the home page's inspection link leads to a suggested inspection offer", async () => {
+  render(<App />);
+  expect(screen.getByRole("heading", { name: "Five records that turn a complaint into evidence." })).toBeTruthy();
+  expect(screen.getByText(/Pass the officer check/)).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: /repair broke again\? start with an inspection/i }));
+  expect(description().value).toBe(REPAIR_STARTER);
+  fireEvent.change(description(), { target: { value: REPAIR_STARTER + "Ring Road, near the bus stop." } });
+  fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+
+  await screen.findByText("What time period does this relate to?");
+  fireEvent.click(screen.getByRole("button", { name: "Last 6 months" }));
+  fireEvent.click(screen.getByRole("button", { name: "No, not sure" }));
+  fireEvent.click(screen.getByRole("button", { name: "Work order for repair" }));
+  fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+
+  await screen.findByText(/has been broken down/);
+  expect(screen.getByText("Suggested for your complaint")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /ask to inspect the work/i }));
+  expect(screen.getByText("Inspection added")).toBeTruthy();
+});
+
+test("'Check my draft' and the header both open the PIO review page, which keeps the pasted text", () => {
+  render(<App />);
+
+  fireEvent.click(homeButton(/check my draft/i));
+  expect(screen.getByRole("heading", { name: "Check an RTI application" })).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Your application"), { target: { value: "1. Copy of the work order" } });
+
+  fireEvent.click(screen.getByRole("button", { name: "RTI Copilot" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check a draft" }));
+  expect((screen.getByLabelText("Your application") as HTMLTextAreaElement).value).toBe("1. Copy of the work order");
+});
+
+test("the plain start button opens an empty description, never a stray starter", () => {
+  render(<App />);
+  fireEvent.click(homeButton(/start my rti/i));
+  expect(description().value).toBe("");
+});
+
+test("the home page has its own footer; every other page has the app's", () => {
+  render(<App />);
+  expect(screen.getAllByRole("contentinfo")).toHaveLength(1);
+  expect(screen.getByText(/Photos via Wikimedia Commons/)).toBeTruthy();
+
+  fireEvent.click(homeButton(/i got a reply/i));
+  expect(screen.queryByText(/Photos via Wikimedia Commons/)).toBeNull();
+  expect(screen.getByText(/Right to Information Act, 2005 · Public Works Department/)).toBeTruthy();
 });

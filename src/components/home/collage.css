@@ -1,0 +1,59 @@
+.collage-section {
+  overflow: hidden;
+  background: var(--paper-warm);
+}
+
+.collage-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 40px 56px;
+  padding-block: clamp(64px, 8vw, 120px);
+}
+
+.collage-intro {
+  flex: 1 1 280px;
+  max-width: 360px;
+}
+
+.collage-title {
+  font-size: clamp(44px, 5vw, 76px);
+}
+
+.collage-text {
+  margin-top: 18px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.collage-hand {
+  margin-top: 14px;
+  font-size: 24px;
+  color: var(--ink-blue);
+}
+
+.collage-reveal {
+  flex: 999 1 600px;
+  min-width: 0;
+}
+
+.collage {
+  --drift-scale: 1;
+  position: relative;
+  height: clamp(440px, 50vw, 720px);
+}
+
+.collage-photo {
+  position: absolute;
+  object-fit: cover;
+  /* --drift runs from -0.5 to 0.5 as the collage crosses the window; --shift is how far
+     this photo travels over that distance. */
+  transform: translate3d(calc(var(--drift, 0) * var(--shift, 0px) * var(--drift-scale)), 0, 0);
+}
+
+@media (max-width: 640px) {
+  .collage {
+    --drift-scale: 0.35;
+  }
+}
