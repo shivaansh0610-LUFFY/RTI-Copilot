@@ -85,6 +85,13 @@ that plays on the application sheet, and the problems PWD handles to start from)
 filing date is entered), and print / save as PDF for the draft and the appeal. Inputs are
 size-limited on the API.
 
+The pages after the home page share its look (paper, ink blue, Khand titles; the colours and
+fonts are Tailwind theme values in `src/index.css`), each with one touch from paper
+(`src/components/layout/paper.css`): the application on a taped sheet with the PIO review's
+score stamped on it, the officer check's excuses in red pen in the margin, the PIO review's
+score as a rubber stamp, the PIO's reply marked with highlighters (green answered, amber partly,
+red refused), and My RTIs as a ruled register with the deadlines as date stamps.
+
 The home page's photos come from Wikimedia Commons under CC BY, CC BY-SA, CC0 and GODL-India;
 each is credited in the page footer, from `src/components/home/photos.ts`, which a test keeps
 complete. Its fonts (Khand, Kalam, IBM Plex, Noto Serif; SIL Open Font License) are bundled
