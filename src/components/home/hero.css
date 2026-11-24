@@ -175,6 +175,13 @@
   text-shadow: none;
 }
 
+.hero-independent {
+  margin-top: 18px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.82);
+}
+
 .hero-btn {
   display: inline-flex;
   align-items: center;

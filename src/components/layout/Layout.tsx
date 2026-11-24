@@ -119,7 +119,12 @@ export function SiteHeader({
   onNavigate: (view: View) => void;
 }) {
   return (
-    <header className="sticky top-0 z-[1000] border-b border-slate-200 bg-white/95 backdrop-blur">
+    <header
+      className={
+        "sticky top-0 z-[1000] border-b backdrop-blur " +
+        (view === "home" ? "border-[#E0D5BE] bg-[#F6F1E7]/95" : "border-slate-200 bg-white/95")
+      }
+    >
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3">
         <button
           type="button"

@@ -138,6 +138,9 @@ export default function Hero({
               <Scale size={18} aria-hidden="true" />I got a reply
             </button>
           </div>
+          <p className="hero-independent">
+            An independent citizen tool. Not a government website, and not run by PWD Delhi.
+          </p>
         </div>
       </div>
 

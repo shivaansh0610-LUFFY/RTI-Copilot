@@ -28,9 +28,6 @@ export default function HomePage({
   return (
     <div ref={root} className="story">
       <div aria-hidden="true" className="story-progress" />
-      <div className="story-disclaimer">
-        <p className="story-wrap">An independent citizen tool. Not a government website, and not run by PWD Delhi.</p>
-      </div>
       <main>
         <Hero onStart={startBlank} onAnalyse={onAnalyse} onReview={onReview} />
         <RightToInformation />

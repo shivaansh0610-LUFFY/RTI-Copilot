@@ -62,3 +62,8 @@ test("the example file is no longer on top of the photo", () => {
   renderHero();
   expect(screen.queryByText(/example file/i)).toBeNull();
 });
+
+test("the hero says it is not a government website, before anyone scrolls", () => {
+  renderHero();
+  expect(screen.getByText(/Not a government website, and not run by PWD Delhi/)).toBeTruthy();
+});
