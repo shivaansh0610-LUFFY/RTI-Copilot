@@ -109,6 +109,61 @@ def test_classify_reply_keeps_cited_findings(monkeypatch, passages):
     assert "WO/2026/12" in results[0].evidence[0].text
 
 
+def test_classify_reply_grounds_a_claim_worth_checking_against_the_corpus(monkeypatch, passages):
+    from app.services import grounding
+
+    fake_model(
+        monkeypatch,
+        {"results": [{"request_id": "RQ-002", "label": "NO_RECORD_STATED", "explanation": "Not held.", "evidence": ["P-3"]}]},
+    )
+    corpus_passage = grounding.CorpusPassage(
+        id="S-1", text="Measurements of work done shall be recorded in the Measurement Book.",
+        page=42, source_title="CPWD Works Manual", url="https://example.gov/manual.pdf",
+    )
+    seen: dict[str, object] = {}
+
+    def fake_passages_for(query, k, doc_types=None, **kwargs):
+        seen["query"], seen["doc_types"] = query, doc_types
+        return [corpus_passage]
+
+    monkeypatch.setattr(response_analysis.grounding, "passages_for", fake_passages_for)
+
+    result = classify_reply(REQUESTS[1:2], passages)[0]
+
+    assert seen["doc_types"] == ["manual"]
+    assert [citation.id for citation in result.grounding] == ["S-1"]
+    assert "Measurement Book" in result.grounding[0].text
+    assert result.grounding[0].source_title == "CPWD Works Manual"
+
+
+def test_classify_reply_does_not_ground_a_label_with_nothing_to_check(monkeypatch, passages):
+    fake_model(
+        monkeypatch,
+        {"results": [{"request_id": "RQ-001", "label": "RESPONSIVE", "explanation": "Given.", "evidence": ["P-2"]}]},
+    )
+
+    result = classify_reply(REQUESTS[:1], passages)[0]
+
+    assert result.grounding == []
+
+
+def test_classify_reply_shows_the_finding_even_when_grounding_itself_fails(monkeypatch, passages):
+    fake_model(
+        monkeypatch,
+        {"results": [{"request_id": "RQ-003", "label": "FEE_DEMANDED", "explanation": "Pay Rs 40.", "evidence": ["P-4"]}]},
+    )
+
+    def raise_unreachable(*args, **kwargs):
+        raise RuntimeError("database unreachable")
+
+    monkeypatch.setattr(response_analysis.grounding, "passages_for", raise_unreachable)
+
+    result = classify_reply(REQUESTS[2:3], passages)[0]
+
+    assert result.label == "FEE_DEMANDED"
+    assert result.grounding == []
+
+
 def test_classify_reply_never_trusts_an_uncited_or_unknown_finding(monkeypatch, passages):
     fake_model(
         monkeypatch,

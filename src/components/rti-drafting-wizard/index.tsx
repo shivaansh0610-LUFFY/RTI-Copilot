@@ -1,6 +1,7 @@
 import { ArrowRight, CornerDownRight, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
+  ApplicantDetails,
   ClarifyQuestion,
   DraftLanguage,
   DraftResult,
@@ -23,6 +24,7 @@ import {
 } from "./mocks";
 import { qualityOf } from "./preflight";
 import {
+  ApplicantDetailsStep,
   ClarifyStep,
   DescribeStep,
   DraftStep,
@@ -65,9 +67,9 @@ export default function RtiDraftingWizard({
       : (starter ?? ""),
   );
   const [grievanceError, setGrievanceError] = useState("");
-  // The photo never leaves this browser. The location reaches the backend only as the
+  // The photos never leave this browser. The location reaches the backend only as the
   // "Location:" line kept in `grievance`.
-  const [photo, setPhoto] = useState<File | undefined>();
+  const [photos, setPhotos] = useState<File[]>([]);
   const [issueLocation, setIssueLocation] = useState<IssueLocation | undefined>();
 
   const [clarifyQuestions, setClarifyQuestions] = useState<ClarifyQuestion[]>([]);
@@ -82,6 +84,15 @@ export default function RtiDraftingWizard({
   const [preflight, setPreflight] = useState<PreflightResult | undefined>();
   const [preflightStale, setPreflightStale] = useState(false);
   const [preflightError, setPreflightError] = useState("");
+  const [applicantDetails, setApplicantDetails] = useState<ApplicantDetails>({
+    name: "",
+    relation: "son",
+    relativeName: "",
+    address: "",
+    phone: "",
+    mobile: "",
+  });
+  const [applicantError, setApplicantError] = useState("");
   const [draft, setDraft] = useState<DraftResult | undefined>();
   const [draftError, setDraftError] = useState("");
   const [language, setLanguage] = useState<DraftLanguage>("en");
@@ -113,7 +124,7 @@ export default function RtiDraftingWizard({
     setIsLoading(true);
     createCase(grievance)
       .then((newCaseId) =>
-        getClarifyQuestions(newCaseId).then((result) => {
+        getClarifyQuestions(newCaseId, grievance).then((result) => {
           setCaseId(newCaseId);
           // Anything the grievance already stated is pre-filled, not asked again.
           const mergedAnswers = { ...clarificationAnswers, ...result.answers };
@@ -257,6 +268,16 @@ export default function RtiDraftingWizard({
       setDraftError("Every request needs some wording. Write it, or go back and remove it.");
       return;
     }
+    setDraftError("");
+    setStep("applicant-details");
+  }
+
+  function handleApplicantDetailsContinue() {
+    if (!applicantDetails.name.trim() || !applicantDetails.relativeName.trim() || !applicantDetails.address.trim()) {
+      setApplicantError("Please fill in your name, relative's name and address to continue.");
+      return;
+    }
+    setApplicantError("");
     requestDraft(
       requests.map((r) => ({ ...r, title: r.title.trim() })),
       language,
@@ -276,7 +297,8 @@ export default function RtiDraftingWizard({
     if (step === "clarify") setStep("describe");
     else if (step === "requests") setStep("clarify");
     else if (step === "check") setStep("requests");
-    else if (step === "draft") setStep("check");
+    else if (step === "applicant-details") setStep("check");
+    else if (step === "draft") setStep("applicant-details");
   }
 
   return (
@@ -307,8 +329,8 @@ export default function RtiDraftingWizard({
               grievance={grievance}
               onChange={setGrievance}
               error={grievanceError}
-              photo={photo}
-              onPhotoChange={setPhoto}
+              photos={photos}
+              onPhotosChange={setPhotos}
               location={issueLocation}
               onLocationChange={handleLocationChange}
             />
@@ -349,10 +371,20 @@ export default function RtiDraftingWizard({
             />
           )}
 
+          {step === "applicant-details" && (
+            <ApplicantDetailsStep
+              details={applicantDetails}
+              onChange={setApplicantDetails}
+              error={applicantError}
+            />
+          )}
+
           {step === "draft" && draft && (
             <DraftStep
               draft={draft}
               requests={requests}
+              photos={photos}
+              applicant={applicantDetails}
               language={language}
               onLanguageChange={(next) => requestDraft(requests, next)}
               isUpdating={isLoading}
@@ -388,6 +420,12 @@ export default function RtiDraftingWizard({
           )}
           {step === "check" && (
             <PrimaryButton onClick={handleCheckContinue} disabled={isLoading}>
+              {isLoading && <Loader2 size={14} className="animate-spin" />}
+              Continue
+            </PrimaryButton>
+          )}
+          {step === "applicant-details" && (
+            <PrimaryButton onClick={handleApplicantDetailsContinue} disabled={isLoading}>
               {isLoading && <Loader2 size={14} className="animate-spin" />}
               Continue
             </PrimaryButton>

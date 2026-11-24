@@ -13,7 +13,8 @@ is a blunt thing to cite. So paragraphs are rebuilt in three steps:
 Paragraphs with no letters in them (a lone page number) are dropped.
 
 A page with (almost) no text to split -- a scanned manual, a photocopied PIO reply -- is read
-with Tesseract instead; see pdf_pages().
+with Tesseract instead, and so is a page whose text came back garbled rather than missing (a bad
+font encoding in the scanning app's own text layer); see pdf_pages().
 """
 
 import io
@@ -37,6 +38,33 @@ logging.getLogger("pypdf").setLevel(logging.ERROR)
 # A handful of stray characters (a page number, a stamp) should not count as "has text".
 OCR_THRESHOLD_CHARS = 20
 OCR_DPI = 300
+
+# A scanning app (Adobe Scan and others) can embed a text layer whose font encoding pypdf
+# decodes wrong -- plenty of characters come back, so the OCR_THRESHOLD_CHARS check above never
+# fires, but the "text" is gibberish ("Gxdi ent > d L2(u-4)..."). Real prose, in English or
+# Hindi, uses a handful of extremely common function words constantly; a page this size with
+# almost none of them is a decoding failure, not unusual writing, and is sent to OCR too.
+GARBLED_WORD_RE = re.compile(r"[A-Za-zऀ-ॿ]+")
+GARBLED_MIN_WORDS = 20  # too little text to judge the ratio confidently below this
+GARBLED_MAX_COMMON_RATIO = 0.03
+_COMMON_WORDS = frozenset(
+    # English function words, frequent enough to appear in almost any real paragraph.
+    "the of and to a in is for on that by with as this it be are was an at from or not will "
+    "shall under section have has been can which these those i you we they he she".split()
+    # Hindi function words, for replies and notices written in Devanagari.
+    + "के की का है में को और से पर यह इस हैं भी ने कि एवं तथा एक सभी".split()
+)
+
+
+def _looks_garbled(text: str) -> bool:
+    # Words of 1-2 letters are dropped: short garbled fragments coincidentally match one of
+    # "he", "is", "at", "no"... often enough to mask real gibberish, where they are noise, not
+    # signal -- a 3+ letter match like "the" or "section" is not a coincidence.
+    words = [word for word in GARBLED_WORD_RE.findall(text.lower()) if len(word) >= 3]
+    if len(words) < GARBLED_MIN_WORDS:
+        return False
+    common = sum(1 for word in words if word in _COMMON_WORDS)
+    return common / len(words) < GARBLED_MAX_COMMON_RATIO
 
 # The tesseract binary itself (installed separately; not a pip package). An env var wins if
 # set; otherwise PATH (how `apt-get install tesseract-ocr` leaves it in Docker/Linux), falling
@@ -90,8 +118,11 @@ def pdf_pages(source: Path | BinaryIO, ocr_used: list[bool] | None = None) -> li
 
     A page pypdf finds (almost) no text on is assumed scanned, not blank, and OCR'd instead --
     a photocopied PIO reply or an old scanned manual has no selectable text at all, but is still
-    a real document a citizen needs read. When `ocr_used` is given, one bool is appended per
-    page: whether that page was sent to OCR (regardless of whether OCR then found anything)."""
+    a real document a citizen needs read. So is a page pypdf found plenty of characters on but
+    that reads as gibberish (see _looks_garbled): some scanning apps embed a text layer pypdf
+    decodes wrong, which this threshold alone would never catch. When `ocr_used` is given, one
+    bool is appended per page: whether that page was sent to OCR (regardless of whether OCR then
+    found anything)."""
     name = source.name if isinstance(source, Path) else "downloaded PDF"
     data = source.read_bytes() if isinstance(source, Path) else source.read()
     try:
@@ -102,7 +133,7 @@ def pdf_pages(source: Path | BinaryIO, ocr_used: list[bool] | None = None) -> li
                 text = page.extract_text() or ""
             except Exception as error:  # pypdf raises many types on damaged pages; say which page
                 raise ExtractionError(f"{name}: could not read page {number}: {error}") from error
-            needs_ocr = len(text.strip()) < OCR_THRESHOLD_CHARS
+            needs_ocr = len(text.strip()) < OCR_THRESHOLD_CHARS or _looks_garbled(text)
             if needs_ocr:
                 text = _ocr_page(data, number - 1) or text
             if ocr_used is not None:

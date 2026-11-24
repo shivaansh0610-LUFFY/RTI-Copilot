@@ -60,6 +60,37 @@ def test_generate_clarify_result_falls_back_when_period_resolved_nowhere(monkeyp
     assert result == real.mock.generate_clarify_result("There is a pothole")
 
 
+def test_generate_clarify_result_reuses_the_cached_question_for_the_same_grievance(monkeypatch):
+    calls = []
+
+    def complete_json(system, user, **kwargs):
+        calls.append(user)
+        return {"answers": {"period": "Last 2 months"}, "questions": [{"key": "location", "question": "Where?", "options": ["A", "B"]}]}
+
+    monkeypatch.setattr(real.llm, "complete_json", complete_json)
+
+    first = real.generate_clarify_result("Pothole outside house number 12")
+    second = real.generate_clarify_result("Pothole outside house number 12")
+
+    assert first == second
+    assert len(calls) == 1  # the model was asked only once; the second call was served from cache
+
+
+def test_generate_clarify_result_asks_again_for_a_different_grievance(monkeypatch):
+    calls = []
+
+    def complete_json(system, user, **kwargs):
+        calls.append(user)
+        return {"answers": {"period": "Last 2 months"}, "questions": []}
+
+    monkeypatch.setattr(real.llm, "complete_json", complete_json)
+
+    real.generate_clarify_result("Pothole outside house number 12")
+    real.generate_clarify_result("Streetlight not working near the park")
+
+    assert len(calls) == 2
+
+
 def test_decompose_grievance_parses_llm_response(monkeypatch):
     monkeypatch.setattr(
         real.llm,
@@ -107,6 +138,141 @@ def test_decompose_grievance_passes_every_clarification_answer_as_context(monkey
 
     assert "location: Main road" in seen_prompts[0]
     assert "period: Last 1 year" in seen_prompts[0]
+
+
+def test_generate_clarify_result_forces_a_multi_select_question_onto_the_known_key(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: {
+            "answers": {"period": "Last 1 year"},
+            "questions": [
+                {"key": "whatever_the_model_called_it", "question": "What records?",
+                 "options": ["Work order", "Inspection report"], "multi": True},
+            ],
+        },
+    )
+
+    result = real.generate_clarify_result("There is a pothole on Main Road")
+
+    assert result.questions[0].key == real.RECORD_TYPES_KEY
+    assert result.questions[0].multi is True
+
+
+def test_generate_clarify_result_detects_a_record_type_question_even_without_the_multi_flag(monkeypatch):
+    # Seen in practice: the model asks the record-type question without ever setting "multi",
+    # which would otherwise render as single-select and leave the citizen unable to pick a second
+    # type of record.
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: {
+            "answers": {"period": "Last 1 year"},
+            "questions": [
+                {"key": "documentType", "question": "Which document would you like to obtain regarding this road work?",
+                 "options": ["Work order/contract details", "Inspection report"]},
+            ],
+        },
+    )
+
+    result = real.generate_clarify_result("There is a pothole on Main Road")
+
+    assert result.questions[0].key == real.RECORD_TYPES_KEY
+    assert result.questions[0].multi is True
+
+
+def test_generate_clarify_result_detects_record_types_from_the_options_when_the_wording_has_neither_word(monkeypatch):
+    # Seen in practice: no "multi" flag, and the question says neither "record" nor "document" --
+    # only the options themselves (report/order/log/details) give it away.
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: {
+            "answers": {"period": "Last 6 months"},
+            "questions": [
+                {"key": "infoType", "question": "What type of information would you like to obtain from the PWD?",
+                 "options": [
+                     "Inspection report of the streetlights",
+                     "Work order/repair order for the streetlights",
+                     "Maintenance log and spending details for the streetlights",
+                 ]},
+            ],
+        },
+    )
+
+    result = real.generate_clarify_result("The streetlights have not worked in months")
+
+    assert result.questions[0].key == real.RECORD_TYPES_KEY
+    assert result.questions[0].multi is True
+
+
+def test_generate_clarify_result_leaves_an_ordinary_question_single_select(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda *a, **k: {
+            "answers": {},
+            "questions": [
+                {"key": "period", "question": "What time period does this relate to?",
+                 "options": ["Last 6 months", "Last 1 year"]},
+            ],
+        },
+    )
+
+    result = real.generate_clarify_result("There is a pothole on Main Road")
+
+    assert result.questions[0].key == "period"
+    assert result.questions[0].multi is False
+
+
+def test_decompose_grievance_tells_the_model_which_record_types_were_chosen(monkeypatch):
+    seen_prompts = []
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda system, user, **kwargs: seen_prompts.append(user)
+        or [{"category": "Inspection report", "title": "Copy of the inspection report", "quality": "good"}],
+    )
+
+    real.decompose_grievance(
+        "There is a pothole", {"period": "Last 1 year", real.RECORD_TYPES_KEY: "Inspection report; Work order"}
+    )
+
+    assert "Inspection report, Work order" in seen_prompts[0]
+
+
+def test_decompose_grievance_drops_a_request_for_a_type_that_was_not_chosen(monkeypatch):
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda system, user, **kwargs: [
+            {"category": "Inspection report", "title": "Copy of the inspection report", "quality": "good"},
+            {"category": "Tender", "title": "Details of the tender awarded", "quality": "good"},
+        ],
+    )
+
+    requests = real.decompose_grievance(
+        "There is a pothole", {"period": "Last 1 year", real.RECORD_TYPES_KEY: "Inspection report"}
+    )
+
+    assert [r.category for r in requests] == ["Inspection report"]
+
+
+def test_decompose_grievance_keeps_everything_when_nothing_matches_the_chosen_types(monkeypatch):
+    # The model ignored the instruction entirely -- showing extra requests beats showing none.
+    monkeypatch.setattr(
+        real.llm,
+        "complete_json",
+        lambda system, user, **kwargs: [
+            {"category": "Work order", "title": "Copy of the work order", "quality": "good"},
+        ],
+    )
+
+    requests = real.decompose_grievance(
+        "There is a pothole", {"period": "Last 1 year", real.RECORD_TYPES_KEY: "Inspection report"}
+    )
+
+    assert [r.category for r in requests] == ["Work order"]
 
 
 def test_decompose_grievance_falls_back_on_empty_array(monkeypatch):

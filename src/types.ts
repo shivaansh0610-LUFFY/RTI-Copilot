@@ -29,6 +29,9 @@ export interface ClarifyQuestion {
   key: string;
   question: string;
   options: string[];
+  // True when more than one option can be picked (e.g. "what records do you want"); the chosen
+  // options are stored in the answer joined with "; ".
+  multi?: boolean;
 }
 
 export interface ClarifyResult {
@@ -66,6 +69,18 @@ export interface PreflightItem {
 export interface PreflightResult {
   items: PreflightItem[];
   aiUsed: boolean; // false when only the fixed rules ran
+}
+
+// Collected after the officer check so the printed letter's "To the PIO"
+// particulars arrive filled in rather than left blank for the citizen to write by hand. Only the
+// PDF letter uses this -- the portal's own text box ("Copy draft") has its own such fields.
+export interface ApplicantDetails {
+  name: string;
+  relation: "son" | "daughter" | "wife";
+  relativeName: string; // father's/husband's name, matched to `relation`
+  address: string;
+  phone?: string;
+  mobile?: string;
 }
 
 export interface DraftResult {

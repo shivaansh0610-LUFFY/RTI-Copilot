@@ -25,7 +25,7 @@ from sqlalchemy import Select, func, literal_column, select
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
-from app.models import Passage
+from app.models import Document, Passage, Source
 from app.services import embeddings
 
 CANDIDATES = 50  # hits taken from each search before merging
@@ -36,23 +36,32 @@ ENGLISH = literal_column("'english'::regconfig")  # the configuration the `tsv` 
 
 
 def search_passages(
-    query: str, k: int = 5, *, session: Session | None = None, embedding: list[float] | None = None
+    query: str,
+    k: int = 5,
+    *,
+    session: Session | None = None,
+    embedding: list[float] | None = None,
+    doc_types: Sequence[str] | None = None,
 ) -> list[Passage]:
     """The `k` passages that best match `query`, best first.
 
     Opens its own database session unless one is passed in. The returned passages are fully
     loaded, so they stay usable after that session closes. `embedding` is the query's vector
     when the caller already has it (from embeddings.embed_queries, for several queries at once).
+    `doc_types` restricts the search to passages from sources of those types (see
+    app.models.Source.doc_type), e.g. ["act", "rules"] to search only the RTI Act and Rules.
     """
     if k < 1 or not query.strip():
         return []
     if session is not None:
-        return _search(session, query, k, embedding)
+        return _search(session, query, k, embedding, doc_types)
     with Session(get_engine(), expire_on_commit=False) as own_session:
-        return _search(own_session, query, k, embedding)
+        return _search(own_session, query, k, embedding, doc_types)
 
 
-def _search(session: Session, query: str, k: int, embedding: list[float] | None = None) -> list[Passage]:
+def _search(
+    session: Session, query: str, k: int, embedding: list[float] | None, doc_types: Sequence[str] | None
+) -> list[Passage]:
     limit = max(CANDIDATES, k)
     rankings = []
     # Keyword hits go first so that they win ties. A keyword search only returns passages that
@@ -61,41 +70,45 @@ def _search(session: Session, query: str, k: int, embedding: list[float] | None 
     # vector search's arbitrary first hit must not tie with the real match.
     tsquery = build_tsquery(query)
     if tsquery:
-        rankings.append(_keyword_ranking(session, tsquery, limit))
-    rankings.append(_vector_ranking(session, embedding or embeddings.embed_query(query), limit))
+        rankings.append(_keyword_ranking(session, tsquery, limit, doc_types))
+    rankings.append(_vector_ranking(session, embedding or embeddings.embed_query(query), limit, doc_types))
 
     best = reciprocal_rank_fusion(rankings)[:k]
     passages = {passage.id: passage for passage in session.scalars(select(Passage).where(Passage.id.in_(best)))}
     return [passages[passage_id] for passage_id in best]
 
 
-def _vector_ranking(session: Session, embedding: list[float], limit: int) -> list[UUID]:
-    return list(session.scalars(vector_statement(embedding, limit)))
+def _vector_ranking(session: Session, embedding: list[float], limit: int, doc_types: Sequence[str] | None) -> list[UUID]:
+    return list(session.scalars(vector_statement(embedding, limit, doc_types)))
 
 
-def _keyword_ranking(session: Session, tsquery: str, limit: int) -> list[UUID]:
-    return list(session.scalars(keyword_statement(tsquery, limit)))
+def _keyword_ranking(session: Session, tsquery: str, limit: int, doc_types: Sequence[str] | None) -> list[UUID]:
+    return list(session.scalars(keyword_statement(tsquery, limit, doc_types)))
 
 
-def vector_statement(embedding: list[float], limit: int) -> Select[tuple[UUID]]:
-    """Passage ids nearest to `embedding` by cosine distance (`<=>`), nearest first."""
+def _restrict_to_doc_types(statement: Select[tuple[UUID]], doc_types: Sequence[str] | None) -> Select[tuple[UUID]]:
+    if not doc_types:
+        return statement
     return (
-        select(Passage.id)
-        .where(Passage.embedding.is_not(None))
-        .order_by(Passage.embedding.cosine_distance(embedding), *_reading_order())
-        .limit(limit)
+        statement.join(Document, Passage.document_id == Document.id)
+        .join(Source, Document.source_id == Source.id)
+        .where(Source.doc_type.in_(doc_types))
     )
 
 
-def keyword_statement(tsquery: str, limit: int) -> Select[tuple[UUID]]:
+def vector_statement(
+    embedding: list[float], limit: int, doc_types: Sequence[str] | None = None
+) -> Select[tuple[UUID]]:
+    """Passage ids nearest to `embedding` by cosine distance (`<=>`), nearest first."""
+    statement = _restrict_to_doc_types(select(Passage.id).where(Passage.embedding.is_not(None)), doc_types)
+    return statement.order_by(Passage.embedding.cosine_distance(embedding), *_reading_order()).limit(limit)
+
+
+def keyword_statement(tsquery: str, limit: int, doc_types: Sequence[str] | None = None) -> Select[tuple[UUID]]:
     """Passage ids matching the full-text query (`@@`), highest ts_rank first."""
     query = func.to_tsquery(ENGLISH, tsquery)
-    return (
-        select(Passage.id)
-        .where(Passage.tsv.op("@@")(query))
-        .order_by(func.ts_rank(Passage.tsv, query).desc(), *_reading_order())
-        .limit(limit)
-    )
+    statement = _restrict_to_doc_types(select(Passage.id).where(Passage.tsv.op("@@")(query)), doc_types)
+    return statement.order_by(func.ts_rank(Passage.tsv, query).desc(), *_reading_order()).limit(limit)
 
 
 def _reading_order():

@@ -16,19 +16,22 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { useState } from "react";
-import { printText } from "../../print";
+import { postalLetterHeading, postalLetterText, printText, printTextWithPhotos } from "../../print";
 import PioReview from "../pio-review/PioReview";
 import type {
+  ApplicantDetails,
   ClarifyQuestion,
   DraftLanguage,
   DraftResult,
   InformationRequest,
   PreflightResult,
 } from "../../types";
+import { MULTI_SELECT_SEPARATOR } from "./constants";
 import { INSPECTION_IDS, type InspectionKind } from "./inspection";
 import type { IssueLocation } from "./location";
 import { PhotoLocation } from "./PhotoLocation";
 import { useLocationPicker } from "./use-location-picker";
+import { useObjectUrl } from "./use-object-url";
 import {
   CategoryBadge,
   PrimaryButton,
@@ -41,16 +44,16 @@ export function DescribeStep({
   grievance,
   onChange,
   error,
-  photo,
-  onPhotoChange,
+  photos,
+  onPhotosChange,
   location,
   onLocationChange,
 }: {
   grievance: string;
   onChange: (value: string) => void;
   error: string;
-  photo: File | undefined;
-  onPhotoChange: (photo: File | undefined) => void;
+  photos: File[];
+  onPhotosChange: (photos: File[]) => void;
   location: IssueLocation | undefined;
   onLocationChange: (location: IssueLocation | undefined) => void;
 }) {
@@ -87,8 +90,8 @@ export function DescribeStep({
       />
       {error && <p className="text-[13px] text-red-600">{error}</p>}
       <PhotoLocation
-        photo={photo}
-        onPhotoChange={onPhotoChange}
+        photos={photos}
+        onPhotosChange={onPhotosChange}
         location={location}
         picker={picker}
       />
@@ -109,28 +112,51 @@ export function ClarifyStep({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      {questions.map((question) => (
-        <div key={question.key} className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-slate-900">{question.question}</label>
-          <div className="flex flex-wrap gap-2">
-            {question.options.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onSelect(question.key, option)}
-                className={
-                  "rounded-full border px-3 py-1.5 text-sm " +
-                  (answers[question.key] === option
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-300 text-slate-700")
-                }
-              >
-                {option}
-              </button>
-            ))}
+      {questions.map((question) => {
+        const chosen = question.multi
+          ? answers[question.key]?.split(MULTI_SELECT_SEPARATOR).filter(Boolean) ?? []
+          : [];
+        return (
+          <div key={question.key} className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-slate-900">
+              {question.question}
+              {question.multi && (
+                <span className="ml-1.5 font-normal text-slate-500">(choose all that apply)</span>
+              )}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {question.options.map((option) => {
+                const isSelected = question.multi ? chosen.includes(option) : answers[question.key] === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      if (!question.multi) {
+                        onSelect(question.key, option);
+                        return;
+                      }
+                      const next = isSelected
+                        ? chosen.filter((value) => value !== option)
+                        : [...chosen, option];
+                      onSelect(question.key, next.join(MULTI_SELECT_SEPARATOR));
+                    }}
+                    className={
+                      "rounded-full border px-3 py-1.5 text-sm " +
+                      (isSelected
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-300 text-slate-700")
+                    }
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {error && <p className="text-[13px] text-red-600">{error}</p>}
     </div>
@@ -493,6 +519,132 @@ export function OfficerCheckStep({
   );
 }
 
+const RELATIONS: { value: ApplicantDetails["relation"]; label: string }[] = [
+  { value: "son", label: "Son" },
+  { value: "daughter", label: "Daughter" },
+  { value: "wife", label: "Wife" },
+];
+
+// Asked only once requests (and the officer check) are settled, and only for the PDF letter: the
+// portal's own text box has its own name/address/fee fields, so nothing here reaches the backend.
+export function ApplicantDetailsStep({
+  details,
+  onChange,
+  error,
+}: {
+  details: ApplicantDetails;
+  onChange: (details: ApplicantDetails) => void;
+  error: string;
+}) {
+  function set<K extends keyof ApplicantDetails>(key: K, value: ApplicantDetails[K]) {
+    onChange({ ...details, [key]: value });
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-slate-500">
+        Used only to fill in the printed letter&apos;s particulars (the online portal has its own
+        such fields). Everything here stays on this device.
+      </p>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="applicant-name" className="text-sm font-medium text-slate-900">
+          Your full name
+        </label>
+        <input
+          id="applicant-name"
+          type="text"
+          value={details.name}
+          onChange={(e) => set("name", e.target.value)}
+          maxLength={200}
+          className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-slate-900">You are the</label>
+        <div className="flex flex-wrap gap-2">
+          {RELATIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={details.relation === value}
+              onClick={() => set("relation", value)}
+              className={
+                "rounded-full border px-3 py-1.5 text-sm " +
+                (details.relation === value
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-300 text-slate-700")
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="applicant-relative" className="text-sm font-medium text-slate-900">
+          {details.relation === "wife" ? "Husband's name" : "Father's name"}
+        </label>
+        <input
+          id="applicant-relative"
+          type="text"
+          value={details.relativeName}
+          onChange={(e) => set("relativeName", e.target.value)}
+          maxLength={200}
+          className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="applicant-address" className="text-sm font-medium text-slate-900">
+          Your address
+        </label>
+        <textarea
+          id="applicant-address"
+          value={details.address}
+          onChange={(e) => set("address", e.target.value)}
+          rows={2}
+          maxLength={400}
+          className="rounded-md border border-slate-300 p-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="applicant-phone" className="text-sm font-medium text-slate-900">
+            Telephone <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <input
+            id="applicant-phone"
+            type="tel"
+            value={details.phone ?? ""}
+            onChange={(e) => set("phone", e.target.value)}
+            maxLength={30}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="applicant-mobile" className="text-sm font-medium text-slate-900">
+            Mobile <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <input
+            id="applicant-mobile"
+            type="tel"
+            value={details.mobile ?? ""}
+            onChange={(e) => set("mobile", e.target.value)}
+            maxLength={30}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-[13px] text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 const LANGUAGES: { code: DraftLanguage; label: string }[] = [
   { code: "en", label: "English" },
   { code: "hi", label: "हिंदी" },
@@ -508,6 +660,8 @@ function dateAfter(from: Date, days: number): string {
 export function DraftStep({
   draft,
   requests,
+  photos,
+  applicant,
   language,
   onLanguageChange,
   isUpdating,
@@ -515,6 +669,8 @@ export function DraftStep({
 }: {
   draft: DraftResult;
   requests: InformationRequest[];
+  photos: File[];
+  applicant: ApplicantDetails;
   language: DraftLanguage;
   onLanguageChange: (language: DraftLanguage) => void;
   isUpdating: boolean;
@@ -524,10 +680,24 @@ export function DraftStep({
   const [copied, setCopied] = useState(false);
   const flaggedTitles = requests.filter((request) => draft.flaggedRequestIds.includes(request.id));
   const today = new Date();
+  // Photos are listed and previewed separately below, and attached as their own pages when
+  // printed -- no need for a text line about them too, which only left a near-empty page of its
+  // own ahead of the actual photo pages.
+  const authority = requests[0]?.authority ?? "The Public Works Department (PWD)";
+  const heading = postalLetterHeading(language);
+  const fullLetter = postalLetterText(draft.draftText, authority, language, applicant);
+
+  function printDraft() {
+    if (photos.length > 0) {
+      printTextWithPhotos("RTI application", fullLetter, photos, heading);
+    } else {
+      printText("RTI application", fullLetter, heading);
+    }
+  }
 
   function copyDraft() {
     navigator.clipboard
-      ?.writeText(draft.draftText)
+      ?.writeText(fullLetter)
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -584,16 +754,18 @@ export function DraftStep({
             {copied ? <Check size={14} /> : <Copy size={14} />}
             {copied ? "Copied" : "Copy draft"}
           </SecondaryButton>
-          <SecondaryButton
-            onClick={() => printText("RTI application", draft.draftText)}
-            disabled={isUpdating}
-            aria-label="Print or save as PDF"
-          >
+          <SecondaryButton onClick={printDraft} disabled={isUpdating} aria-label="Print or save as PDF">
             <Printer size={14} />
             PDF
           </SecondaryButton>
         </div>
       </div>
+      <p className="-mt-2 text-xs text-slate-400">
+        &quot;Copy draft&quot; copies the full letter shown below as text (paste it into Word or
+        an email). &quot;PDF&quot; saves the same letter, with any photos attached as extra pages,
+        as a file. Filing on the online portal instead? Its own text box only wants the numbered
+        request paragraphs -- select and copy just that part below.
+      </p>
 
       {/* Shown like the page it becomes: a readable font, not code. */}
       <div className="rounded-md border border-slate-200 bg-slate-50 p-3 sm:p-4">
@@ -601,13 +773,33 @@ export function DraftStep({
           <FileText size={14} />
           Your application
         </div>
+        <p className="mb-2 text-center text-sm font-semibold text-slate-900">{heading}</p>
         <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-800">
-          {draft.draftText}
+          {fullLetter}
         </pre>
       </div>
       <p className="text-right text-xs text-slate-400">
-        {draft.charCount.toLocaleString()} / 3,000 characters
+        {draft.charCount.toLocaleString()} / 3,000 characters in the request text above (the
+        portal box&apos;s limit)
       </p>
+
+      {photos.length > 0 && (
+        <div className="rounded-md border border-slate-200 p-3">
+          <p className="mb-2 text-[13px] font-medium text-slate-900">
+            Enclosure{photos.length > 1 ? "s" : ""}: {photos.length} photograph
+            {photos.length > 1 ? "s" : ""} of the issue
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {photos.map((photo, index) => (
+              <EnclosurePhoto key={`${photo.name}-${index}`} photo={photo} />
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Listed on the printed copy as an enclosure. Attach the actual photo(s) yourself when
+            you file -- they stay on this device and are never uploaded.
+          </p>
+        </div>
+      )}
 
       <PioReview text={draft.draftText} onUse={onUseText} />
 
@@ -631,5 +823,17 @@ export function DraftStep({
         the PIO. RTI Copilot never submits applications or stores your portal credentials.
       </p>
     </div>
+  );
+}
+
+function EnclosurePhoto({ photo }: { photo: File }) {
+  const url = useObjectUrl(photo);
+  if (!url) return null;
+  return (
+    <img
+      src={url}
+      alt="An enclosed photo of the issue"
+      className="h-16 w-16 rounded-md border border-slate-200 object-cover"
+    />
   );
 }

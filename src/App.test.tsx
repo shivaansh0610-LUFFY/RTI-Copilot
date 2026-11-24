@@ -55,11 +55,22 @@ test("a drafted application appears in My RTIs, and filing it shows the reply de
   await screen.findByText("What time period does this relate to?");
   fireEvent.click(screen.getByRole("button", { name: "Last 6 months" }));
   fireEvent.click(screen.getByRole("button", { name: "No, not sure" }));
+  // Pick a type that stays "good" and one the mock marks "needs-detail", so the officer check
+  // below has an excuse to show.
+  fireEvent.click(screen.getByRole("button", { name: "Inspection report" }));
+  fireEvent.click(screen.getByRole("button", { name: "Budget/expenditure details" }));
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
   await screen.findByText(/has been broken down/);
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
   // The demo's "Details of amount spent" is too vague: the officer check says so.
-  await screen.findByText("The officer could use an excuse on 1 of 3 requests.");
+  await screen.findByText("The officer could use an excuse on 1 of 2 requests.");
+  fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+
+  // "Your details", for the printed letter's particulars.
+  await screen.findByLabelText("Your full name");
+  fireEvent.change(screen.getByLabelText("Your full name"), { target: { value: "Jane Citizen" } });
+  fireEvent.change(screen.getByLabelText(/Father's name/), { target: { value: "John Citizen" } });
+  fireEvent.change(screen.getByLabelText("Your address"), { target: { value: "123 Ring Road" } });
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
   await screen.findByText(/If you file today/);
 
@@ -86,6 +97,7 @@ test("the home page's inspection link leads to a suggested inspection offer", as
   await screen.findByText("What time period does this relate to?");
   fireEvent.click(screen.getByRole("button", { name: "Last 6 months" }));
   fireEvent.click(screen.getByRole("button", { name: "No, not sure" }));
+  fireEvent.click(screen.getByRole("button", { name: "Work order for repair" }));
   fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
   await screen.findByText(/has been broken down/);

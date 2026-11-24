@@ -3,6 +3,7 @@ export type StepId =
   | "clarify"
   | "requests"
   | "check"
+  | "applicant-details"
   | "draft";
 
 // There is no "already public?" step: its mock marked a request public with a made-up
@@ -13,6 +14,7 @@ export const ALL_STEPS: { id: StepId; label: string }[] = [
   { id: "clarify", label: "Clarify" },
   { id: "requests", label: "Requests" },
   { id: "check", label: "Officer check" },
+  { id: "applicant-details", label: "Your details" },
   { id: "draft", label: "Draft" },
 ];
 
@@ -24,3 +26,10 @@ export const PERIOD_OPTIONS = [
   "Last 2 years",
   "More than 2 years",
 ];
+
+// Matches RECORD_TYPES_SEPARATOR in app/services/drafting/mock.py: how a multi-select
+// question's chosen options are joined into the single string answer.
+export const MULTI_SELECT_SEPARATOR = "; ";
+
+// Matches RECORD_TYPES_KEY in app/services/drafting/mock.py.
+export const RECORD_TYPES_KEY = "recordTypes";
