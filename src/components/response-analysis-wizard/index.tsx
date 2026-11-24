@@ -143,9 +143,9 @@ export default function ResponseAnalysisWizard({
       />
 
       {!isReal && (
-        <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-white p-3">
-          <Info size={16} className="mt-0.5 shrink-0 text-slate-500" />
-          <p className="text-[13px] text-slate-600">
+        <div className="flex max-w-3xl items-start gap-2.5 rounded-lg border border-edge bg-card p-4">
+          <Info size={16} className="mt-0.5 shrink-0 text-brown" />
+          <p className="text-[14px] text-ink-3">
             Sample data: this shows how a reply is analysed. Draft an application first to analyse
             a real reply against your own requests.
           </p>
@@ -154,7 +154,7 @@ export default function ResponseAnalysisWizard({
 
       <StepProgress steps={ANALYSIS_STEPS} currentId={step} />
 
-      <StepCard>
+      <StepCard wide={step === "align" || step === "classify"}>
         <StepCardBody>
           {step === "upload" && (
             <UploadStep
@@ -171,7 +171,9 @@ export default function ResponseAnalysisWizard({
             <AlignStep requests={requests} alignment={alignment} passages={ingestResult?.passages ?? []} />
           )}
 
-          {step === "classify" && <ClassifyStep requests={requests} results={classifications} />}
+          {step === "classify" && (
+            <ClassifyStep requests={requests} results={classifications} passages={ingestResult?.passages ?? []} />
+          )}
 
           {step === "summary" && (
             <SummaryStep

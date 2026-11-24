@@ -94,14 +94,18 @@ export const NEXT_STEP_HINT: Partial<Record<ClassificationLabel, string>> = {
   TRANSFERRED: "Wait for a reply from the authority it was transferred to.",
 };
 
-export const LABEL_BADGE_CLASSES: Record<ClassificationLabel, string> = {
-  RESPONSIVE: "bg-green-50 text-green-700",
-  PARTIALLY_RESPONSIVE: "bg-amber-50 text-amber-700",
-  NON_RESPONSIVE: "bg-red-50 text-red-700",
-  NO_RECORD_STATED: "bg-red-50 text-red-700",
-  EXEMPTION_CLAIMED: "bg-gray-50 text-gray-600",
-  TRANSFERRED: "bg-gray-50 text-gray-600",
-  FEE_DEMANDED: "bg-gray-50 text-gray-600",
-  ATTACHMENT_REFERENCED: "bg-gray-50 text-gray-600",
-  INSUFFICIENT_EVIDENCE: "bg-gray-50 text-gray-600",
+// How each finding is marked: green answered, amber partly answered, red refused or dodged,
+// grey for a next step that is neither (a fee, a transfer, an attachment, or no clear answer).
+export type LabelTone = "good" | "part" | "bad" | "info";
+
+export const LABEL_TONE: Record<ClassificationLabel, LabelTone> = {
+  RESPONSIVE: "good",
+  PARTIALLY_RESPONSIVE: "part",
+  NON_RESPONSIVE: "bad",
+  NO_RECORD_STATED: "bad",
+  EXEMPTION_CLAIMED: "bad",
+  TRANSFERRED: "info",
+  FEE_DEMANDED: "info",
+  ATTACHMENT_REFERENCED: "info",
+  INSUFFICIENT_EVIDENCE: "info",
 };
