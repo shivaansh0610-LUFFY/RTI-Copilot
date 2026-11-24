@@ -28,14 +28,18 @@ const LOOSE_FIX_METERS = 100;
 // "approximate".
 const NETWORK_FIX_METERS = 10_000;
 
+// People filing by hand are used to attaching several photos of the same problem (different
+// angles, a close-up and a wider shot); one was an arbitrary limit this lifts.
+export const MAX_PHOTOS = 5;
+
 export function PhotoLocation({
-  photo,
-  onPhotoChange,
+  photos,
+  onPhotosChange,
   location,
   picker,
 }: {
-  photo: File | undefined;
-  onPhotoChange: (photo: File | undefined) => void;
+  photos: File[];
+  onPhotosChange: (photos: File[]) => void;
   location: IssueLocation | undefined;
   picker: LocationPicker;
 }) {
@@ -51,11 +55,19 @@ export function PhotoLocation({
       setPhotoError("Please choose a photo (an image file).");
       return;
     }
+    if (photos.length >= MAX_PHOTOS) {
+      setPhotoError(`You can add up to ${MAX_PHOTOS} photos.`);
+      return;
+    }
     setPhotoError("");
-    onPhotoChange(file);
+    onPhotosChange([...photos, file]);
     // Taking the photo is the moment the citizen is at the spot. Don't override a fix they
     // already have, or start a second GPS request on top of one already running.
     if (!location && !picker.isLocating) picker.locateDevice();
+  }
+
+  function removePhoto(index: number) {
+    onPhotosChange(photos.filter((_, i) => i !== index));
   }
 
   return (
@@ -64,7 +76,7 @@ export function PhotoLocation({
       className="flex flex-col gap-3 rounded-md border border-slate-200 p-3"
     >
       <p className="text-[13px] font-medium text-slate-900">
-        Add a photo <span className="font-normal text-slate-500">(optional)</span>
+        Add a photo <span className="font-normal text-slate-500">(optional, up to {MAX_PHOTOS})</span>
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -98,7 +110,13 @@ export function PhotoLocation({
       />
 
       {photoError && <p className="text-[13px] text-amber-600">{photoError}</p>}
-      {photo && <PhotoPreview photo={photo} onRemove={() => onPhotoChange(undefined)} />}
+      {photos.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {photos.map((photo, index) => (
+            <PhotoPreview key={`${photo.name}-${index}`} photo={photo} onRemove={() => removePhoto(index)} />
+          ))}
+        </div>
+      )}
 
       <div aria-live="polite" className="flex flex-col gap-1.5">
         {picker.isLocating && (
@@ -186,8 +204,9 @@ function PhotoPreview({ photo, onRemove }: { photo: File; onRemove: () => void }
       )}
       <div className="flex flex-col items-start gap-1">
         <p className="text-[13px] text-slate-700">
-          Photo added. It stays on this device and isn&apos;t sent anywhere, so attach it yourself
-          when you file.
+          Photo added. It stays on this device and isn&apos;t sent anywhere -- it's listed as an
+          enclosure on the draft, and the Draft step lets you print or save it alongside the
+          application, but you attach it yourself when you file.
         </p>
         <button
           type="button"
