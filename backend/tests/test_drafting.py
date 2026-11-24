@@ -15,7 +15,8 @@ def test_clarify_questions_returns_the_mock_questions(client, case_id):
     body = response.json()
     assert body["answers"] == {}
     questions = body["questions"]
-    assert [q["key"] for q in questions] == ["period", "knowsAuthority"]
+    assert [q["key"] for q in questions] == ["period", "knowsAuthority", "recordTypes"]
+    assert questions[2]["multi"] is True
     for question in questions:
         assert question["question"]
         assert len(question["options"]) >= 2
@@ -31,6 +32,16 @@ def test_decompose_returns_information_requests(client, case_id):
         assert request["period"] == "Last 6 months"
         # Unset optional fields are omitted, matching the optional fields in src/types.ts.
         assert "publiclyAvailable" not in request
+
+
+def test_decompose_honours_the_chosen_record_types(client, case_id):
+    response = client.post(
+        f"/cases/{case_id}/decompose",
+        json={"clarification": {"period": "Last 6 months", "recordTypes": "Inspection report; Correspondence regarding the issue"}},
+    )
+    assert response.status_code == 200
+    requests = response.json()
+    assert [r["category"] for r in requests] == ["Inspection report", "Correspondence"]
 
 
 def test_public_info_check_marks_every_request(client, case_id):

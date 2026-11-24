@@ -6,14 +6,23 @@ breaks the endpoint for the citizen filing a request.
 import logging
 import re
 from datetime import date
+from threading import Lock
 
 from app.config import get_settings
 from app.schemas import Citation, ClarifyQuestion, ClarifyResult, InformationRequest
 from app.services import grounding, llm, public_info
 from app.services.drafting import mock
-from app.services.drafting.mock import DEFAULT_AUTHORITY
+from app.services.drafting.mock import DEFAULT_AUTHORITY, RECORD_TYPES_KEY, RECORD_TYPES_SEPARATOR
 
 logger = logging.getLogger(__name__)
+
+# Same grievance text in, same clarifying question out: the model is not asked to be
+# deterministic, its first answer for this exact text is simply remembered and reused, so two
+# citizens (or the same one, twice) who type the identical grievance are not asked different
+# questions by chance. Keyed on the grievance text exactly as typed; a reworded grievance is a
+# cache miss and goes to the model as usual.
+_clarify_cache: dict[str, ClarifyResult] = {}
+_clarify_cache_lock = Lock()
 
 _MONTH_NAMES = (
     "january", "february", "march", "april", "june", "july", "august",
@@ -51,7 +60,7 @@ what kind of record they most want (a work order, an inspection report, spending
 
 Respond with ONLY one JSON object, no prose, no markdown fences:
 {"answers": {"<key>": "<value>", ...}, "questions": [{"key": "...", "question": "...", \
-"options": ["...", "..."]}, ...]}
+"options": ["...", "..."], "multi": false}, ...]}
 
 "answers" holds anything the grievance ALREADY states clearly, in your own normalized \
 words — put it there directly and do NOT also ask a question about it. For example, if \
@@ -59,12 +68,19 @@ the grievance says "since 2 months", put {"period": "Last 2 months"} in answers 
 not include a period question. If it names a street, put the location in answers too.
 
 "questions" holds only what is genuinely still missing, 0 to 3 of them. The citizen can \
-only click one of your options — there is no text box, so never write an option like \
-"Other (specify)" or "Something else" that expects them to type an answer; every option \
-must be a complete, useful answer on its own. A time period is always needed, so if the \
-grievance does not already state one clearly enough for "answers", include a period \
-question with generic buckets like ["Last 6 months", "Last 1 year", "Last 2 years", \
-"More than 2 years"] — but never ask it if "answers" already has "period"."""
+only click your options — there is no text box, so never write an option like "Other \
+(specify)" or "Something else" that expects them to type an answer; every option must be \
+a complete, useful answer on its own. A time period is always needed, so if the grievance \
+does not already state one clearly enough for "answers", include a period question with \
+generic buckets like ["Last 6 months", "Last 1 year", "Last 2 years", "More than 2 years"] \
+— but never ask it if "answers" already has "period".
+
+Set "multi": true only for the question asking what kind of record they want (e.g. a work \
+order, an inspection report, spending figures, correspondence) — a citizen can genuinely \
+want more than one kind, so let them pick several. Every other question (period, whether \
+they know the department, and so on) has exactly one right answer, so leave "multi" false \
+(or omit it) there. When "multi" is true the key must be "recordTypes" exactly, so the \
+chosen options can be told apart from a single-pick answer later."""
 
 DECOMPOSE_SYSTEM_PROMPT = """You help a citizen in Delhi file a Right to Information \
 (RTI) Act, 2005 application against the Public Works Department (PWD), Government of \
@@ -104,20 +120,62 @@ apply)."""
 
 
 def generate_clarify_result(grievance: str) -> ClarifyResult:
+    key = grievance.strip()
+    with _clarify_cache_lock:
+        cached = _clarify_cache.get(key)
+    if cached is not None:
+        return cached
+
+    result = _generate_clarify_result(grievance)
+    with _clarify_cache_lock:
+        _clarify_cache.setdefault(key, result)
+    return result
+
+
+# The model is told to set "multi": true on the record-type question and nowhere else, but it
+# doesn't reliably do that, and it phrases the question itself differently every time too --
+# "Which document would you like to obtain...", "What type of information would you like to
+# obtain...", with neither "record" nor "document" in it at all. What stays constant is the shape
+# of its OPTIONS: each one names a kind of record (a report, an order, a log, an itemised detail),
+# which the period's and the department question's options never do. Checking the options is what
+# actually works across every phrasing seen in practice; the question text and the model's own
+# flag are kept as a cheap first check, not the main signal.
+_RECORD_TYPE_QUESTION = re.compile(r"\b(records?|documents?)\b", re.IGNORECASE)
+_RECORD_TYPE_OPTION_WORD = re.compile(
+    r"\b(report|order|log|register|certificate|copy|copies|correspondence|detail|details|"
+    r"record|document|invoice|bill|statement|receipt)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_record_types(options: list[str]) -> bool:
+    return sum(1 for option in options if _RECORD_TYPE_OPTION_WORD.search(option)) >= 2
+
+
+def _parsed_question(item: dict) -> ClarifyQuestion:
+    question = str(item["question"])
+    options = [str(option) for option in item["options"]]
+    is_record_type = (
+        bool(item.get("multi")) or bool(_RECORD_TYPE_QUESTION.search(question)) or _looks_like_record_types(options)
+    )
+    return ClarifyQuestion(
+        # Forced onto one known key regardless of what the model called it, so decompose_grievance
+        # can rely on "recordTypes" existing rather than trust the model to name it consistently.
+        key=RECORD_TYPES_KEY if is_record_type else str(item["key"]),
+        question=question,
+        options=options,
+        multi=is_record_type,
+    )
+
+
+def _generate_clarify_result(grievance: str) -> ClarifyResult:
     try:
         payload = llm.complete_json(CLARIFY_SYSTEM_PROMPT, f"Grievance: {grievance}")
         if not isinstance(payload, dict):
             raise ValueError(f"Expected a JSON object, got: {payload!r}")
 
         answers = {str(key): str(value) for key, value in dict(payload.get("answers") or {}).items()}
-        questions = [
-            ClarifyQuestion(
-                key=str(item["key"]),
-                question=str(item["question"]),
-                options=[str(option) for option in item["options"]],
-            )
-            for item in payload.get("questions") or []
-        ]
+        questions = [_parsed_question(item) for item in payload.get("questions") or []]
         if "period" not in answers and not any(question.key == "period" for question in questions):
             raise ValueError("Model resolved 'period' neither in answers nor as a question")
         return ClarifyResult(answers=answers, questions=questions)
@@ -168,13 +226,37 @@ def todays_date_line() -> str:
     )
 
 
+def _chosen_record_types(clarification: dict[str, str]) -> list[str]:
+    """The record types the citizen actually picked, in the order they picked them, or [] when
+    that question wasn't asked (the grievance already said everything, or it ran on the mock)."""
+    raw = clarification.get(RECORD_TYPES_KEY, "")
+    return [part.strip() for part in raw.split(RECORD_TYPES_SEPARATOR) if part.strip()]
+
+
+def _matches_a_chosen_type(item: dict, chosen_types: list[str]) -> bool:
+    """A loose, case-insensitive match: the model is asked to name the category after the type,
+    but may phrase it slightly differently (e.g. "Inspection reports" for "Inspection report")."""
+    haystack = f"{item.get('category', '')} {item.get('title', '')}".lower()
+    return any(
+        chosen.lower() in haystack or haystack.find(chosen.lower().rstrip("s")) != -1
+        for chosen in chosen_types
+    )
+
+
 def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[InformationRequest]:
     period = clarification.get("period", "Last 1 year")
+    chosen_types = _chosen_record_types(clarification)
     if clarification:
         answers = "\n".join(f"- {key}: {value}" for key, value in clarification.items())
         user_prompt = f"Grievance: {grievance}\nClarifying answers:\n{answers}"
     else:
         user_prompt = f"Grievance: {grievance}\nPeriod of interest: {period}"
+    if chosen_types:
+        user_prompt += (
+            f"\n\nThe citizen chose exactly these record types: {', '.join(chosen_types)}. "
+            "Produce exactly one request per type listed, with its category named after that "
+            "type. Do not produce a request for any record type the citizen did not choose."
+        )
 
     passages = _corpus_passages(grievance)
     system = DECOMPOSE_SYSTEM_PROMPT
@@ -193,6 +275,15 @@ def decompose_grievance(grievance: str, clarification: dict[str, str]) -> list[I
         fabricated = [title for title in titles if _is_fabricated(title)]
         if fabricated:
             raise ValueError(f"Model invented a date, duration or placeholder in: {fabricated!r}")
+
+        if chosen_types:
+            matching = [item for item in items if _matches_a_chosen_type(item, chosen_types)]
+            # Only narrow down to the chosen types if that leaves something -- the model not
+            # following the instruction at all is a worse failure than showing extra requests.
+            if matching:
+                items = matching
+            else:
+                logger.warning("Decompose ignored the chosen record types %r; showing everything it made", chosen_types)
 
         return [
             InformationRequest(

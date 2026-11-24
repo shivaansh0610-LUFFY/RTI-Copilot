@@ -8,6 +8,8 @@ from sqlalchemy import Engine
 from app import db
 from app.config import get_settings
 from app.main import app
+from app.services import response_analysis
+from app.services.drafting import real
 from ingest import extract
 
 
@@ -19,6 +21,24 @@ def no_real_ocr(monkeypatch):
     only the recognition step, so _ocr_page's own rendering logic still runs (cheap, local, no
     subprocess); tests of OCR itself give their own fake recognizer instead."""
     monkeypatch.setattr(extract, "_recognize_text", lambda image_bytes: "")
+
+
+@pytest.fixture(autouse=True)
+def no_real_grounding(monkeypatch):
+    """Grounding a finding against the corpus loads the real (1.3 GB) embedding model and hits
+    a real database -- both off in this suite. This stubs the one entry point response_analysis
+    calls; tests of grounding itself monkeypatch it back with a canned result."""
+    monkeypatch.setattr(response_analysis.grounding, "passages_for", lambda *a, **k: [])
+
+
+@pytest.fixture(autouse=True)
+def clean_clarify_cache():
+    """The same-grievance-same-question cache in app.services.drafting.real is a module-level
+    dict, so without this, one test's cached result would leak into the next test that happens
+    to reuse the same grievance text."""
+    real._clarify_cache.clear()
+    yield
+    real._clarify_cache.clear()
 
 
 @pytest.fixture(autouse=True)

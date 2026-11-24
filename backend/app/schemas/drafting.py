@@ -10,6 +10,9 @@ class ClarifyQuestion(ApiModel):
     key: str
     question: str
     options: list[str]
+    # True when the citizen may pick more than one option (e.g. "what records do you want"); the
+    # chosen options arrive back in the answer joined with "; ". False for an ordinary single pick.
+    multi: bool = False
 
 
 class ClarifyResult(ApiModel):
