@@ -147,7 +147,13 @@ export function SiteHeader({
 }) {
   return (
     <header className="sticky top-0 z-[1000] border-b border-[#e0d5be] bg-paper/95 backdrop-blur">
-      <div className="mx-auto flex min-h-14 max-w-6xl items-center justify-between gap-2 px-3 sm:min-h-16 sm:px-8">
+      {/* As wide as the page under it, so the logo lines up with the page's left edge. */}
+      <div
+        className={
+          "mx-auto flex min-h-14 items-center justify-between gap-2 sm:min-h-16 " +
+          (view === "home" ? "max-w-[1376px] px-[clamp(12px,2.5vw,32px)]" : "max-w-6xl px-3 sm:px-8")
+        }
+      >
         <button
           type="button"
           onClick={() => onNavigate("home")}
