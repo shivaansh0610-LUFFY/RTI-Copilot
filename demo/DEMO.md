@@ -16,15 +16,18 @@ for the right ones and are not fobbed off.
 
 ## The flow (about 5 minutes)
 
-0. **Home page.** The pitch, the problem tiles (only things PWD is responsible for on its
-   roads), and the three steps. Click **Pothole or broken road**.
+0. **Home page.** Scroll the story: the slideshow (each slide pairs a problem with the record
+   to ask for), Right to Information, the five records (open a strip or two), then **How it
+   works**: press play on the application sheet for the 30-second demo. Under the polaroids,
+   the problems are only things PWD is responsible for on its roads. Click **Pothole or
+   broken road**.
 1. **Describe.** Replace the starter sentence with:
    > There is a big pothole on Ring Road near Lajpat Nagar metro station. It has been there
    > for about 6 months, two-wheelers fall almost every week, and nobody from PWD has repaired
    > it despite complaints.
 
-   Tap "Choose on map" and drop the pin near Lajpat Nagar: the street name appears and a
-   `Location:` line is added. (The photo button works too; the photo never leaves the device.)
+   Add a photo: that is when the browser is asked for your location (choose Allow). The
+   street name appears and a `Location:` line is added. The photo never leaves the device.
 2. **Clarify.** The AI already knows the period (6 months) and the place, so it asks only
    what is missing.
 3. **Requests.** Each request is a specific record, and most show **"Why ask for this"**: the
