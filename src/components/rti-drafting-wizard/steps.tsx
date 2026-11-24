@@ -10,8 +10,8 @@ import {
   Plus,
   Printer,
   RefreshCw,
-  ShieldCheck,
   WandSparkles,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { postalLetterHeading, postalLetterText, printText, printTextWithPhotos } from "../../print";
@@ -366,6 +366,8 @@ function InspectionOffer({
 
 // The officer check: each request read the way a reluctant PIO would, with the excuse they
 // could use, why it works, and how to fix it. Nothing here blocks: the citizen decides.
+// Shown as a ruled sheet: the requests on the left, the officer's notes in red pen in the
+// margin (under each request, on a phone).
 export function OfficerCheckStep({
   requests,
   result,
@@ -388,33 +390,31 @@ export function OfficerCheckStep({
   const flagged = requests.filter((r) => (itemsById.get(r.id)?.issues.length ?? 0) > 0).length;
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-        <Gavel size={16} className="mt-0.5 shrink-0 text-slate-700" />
-        <p className="text-[13px] text-slate-700">
-          We read your requests the way a reluctant Public Information Officer would, looking for
-          easy excuses to refuse or delay them. Fix them now, before the 30-day clock starts.
-        </p>
-      </div>
+    <div className="flex flex-col gap-5">
+      <p className="flex max-w-3xl items-start gap-2.5 text-[15px] leading-relaxed text-ink-3">
+        <Gavel size={18} className="mt-0.5 shrink-0 text-brown" />
+        We read your requests the way a reluctant Public Information Officer would, looking for
+        easy excuses to refuse or delay them. Fix them now, before the 30-day clock starts.
+      </p>
 
       {error && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
-          <p className="text-[13px] text-amber-800">{error}</p>
+        <div className={NOTICE + " flex-wrap justify-between"}>
+          <p>{error}</p>
           <SecondaryButton onClick={onRecheck} disabled={isChecking} className="bg-white">
-            {isChecking ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {isChecking ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             Try again
           </SecondaryButton>
         </div>
       )}
 
       {result && (
-        <div role="status" className="flex flex-col gap-1">
-          <p className="text-sm font-semibold text-ink">
+        <div role="status">
+          <p className="font-serif text-[20px] font-semibold leading-snug text-ink sm:text-[22px]">
             {flagged === 0
               ? "No easy excuses found. Your requests ask for specific records."
               : `The officer could use an excuse on ${flagged} of ${requests.length} request${requests.length === 1 ? "" : "s"}.`}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="mt-1 text-sm text-muted">
             {result.aiUsed
               ? "Checked with fixed rules from the RTI Act and by AI. Suggestions only: you decide."
               : "Checked with fixed rules from the RTI Act. Suggestions only: you decide."}
@@ -423,99 +423,112 @@ export function OfficerCheckStep({
       )}
 
       {isStale && result && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 p-3">
-          <p className="text-[13px] text-blue-900">You changed the wording. Check it again?</p>
+        <div className="flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-lg border border-[#c9d3ec] bg-ink-blue-wash p-4">
+          <p className="text-[14px] font-medium text-ink-blue">You changed the wording. Check it again?</p>
           <SecondaryButton onClick={onRecheck} disabled={isChecking} className="bg-white">
-            {isChecking ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {isChecking ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             Check again
           </SecondaryButton>
         </div>
       )}
 
-      {requests.map((request, index) => {
-        const item = itemsById.get(request.id);
-        if (!item || item.issues.length === 0) {
+      <ol aria-label="Your requests, as the officer reads them" className="paper-sheet mt-1">
+        {requests.map((request, index) => {
+          const item = itemsById.get(request.id);
+          const issues = item?.issues ?? [];
+          const suggestion = item?.suggestedTitle;
           return (
-            <RequestCard
+            <li
               key={request.id}
-              request={request}
-              rightSlot={
-                item && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                    <ShieldCheck size={12} />
+              className="grid border-b border-rule last:border-b-0 lg:grid-cols-[minmax(0,1fr)_340px]"
+            >
+              <div className={"flex gap-3 px-5 py-5 sm:gap-4 sm:px-7 " + (issues.length > 0 ? "bg-[#fff8f6]" : "")}>
+                <span className="pt-0.5 font-mono text-[15px] font-semibold text-ink-blue">{index + 1}.</span>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <CategoryBadge>{request.category}</CategoryBadge>
+                    <SourceBadge source={request.source} />
+                  </div>
+                  {issues.length > 0 ? (
+                    <textarea
+                      value={request.title}
+                      onChange={(e) => onTitleChange(request.id, e.target.value)}
+                      aria-label={`Wording of request ${index + 1}`}
+                      rows={2}
+                      maxLength={1000}
+                      className="paper-field w-full border-[#e8a59c] p-3 font-serif text-[15.5px] leading-relaxed"
+                    />
+                  ) : (
+                    <p className="font-serif text-[16px] leading-relaxed text-ink">{request.title}</p>
+                  )}
+                  <p className="mt-1.5 text-xs text-muted">
+                    {request.authority} &middot; {request.period}
+                  </p>
+                  {request.context && (
+                    <p className="mt-2 border-l-2 border-khaki pl-2.5 text-[13px] text-ink-3">{request.context}</p>
+                  )}
+
+                  {issues.length > 0 &&
+                    suggestion &&
+                    (request.title === suggestion ? (
+                      <p className="mt-3 flex items-center gap-1.5 text-[14px] font-semibold text-leaf">
+                        <Check size={16} strokeWidth={3} />
+                        Using the suggested wording
+                      </p>
+                    ) : (
+                      <div className="mt-4 rounded-md border border-dashed border-[#86d69a] bg-leaf-wash p-4">
+                        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-leaf">
+                          <WandSparkles size={14} />
+                          Suggested wording
+                        </p>
+                        <p className="mt-1.5 font-serif text-[15px] leading-relaxed text-ink">{suggestion}</p>
+                        <button
+                          type="button"
+                          onClick={() => onTitleChange(request.id, suggestion)}
+                          className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-md bg-leaf px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0f5a2d]"
+                        >
+                          <Check size={16} />
+                          Use this wording
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* The margin, ruled off in red as in an exercise book. */}
+              <div className="border-t border-dashed border-[#efc2bb] bg-paper-light px-5 py-5 sm:px-7 lg:border-l-2 lg:border-t-0 lg:border-solid lg:border-l-stamp/35">
+                {issues.length > 0 ? (
+                  <div className="flex flex-col gap-5">
+                    {issues.map((issue) => (
+                      <div key={issue.code}>
+                        <p className="pen flex items-center gap-1.5 text-[17px]">
+                          <X size={17} strokeWidth={3} />
+                          The officer could reply:
+                        </p>
+                        <p className="pen mt-1 text-[19px] leading-snug">&ldquo;{issue.officerSays}&rdquo;</p>
+                        <p className="mt-2.5 text-[13.5px] leading-relaxed text-pen">
+                          <span className="font-semibold">Why this works:</span> {issue.why}{" "}
+                          <span className="whitespace-nowrap">({issue.section})</span>
+                        </p>
+                        <p className="mt-1.5 text-[13.5px] leading-relaxed text-pen">
+                          <span className="font-semibold">How to fix it:</span> {issue.fix}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : item ? (
+                  <span className="inline-flex items-center gap-1.5 font-hand text-[18px] text-leaf">
+                    <Check size={18} strokeWidth={3} />
                     No easy excuse
                   </span>
-                )
-              }
-            />
-          );
-        }
-        const suggestion = item.suggestedTitle;
-        return (
-          <div key={request.id} className="rounded-md border border-amber-300 bg-white p-4">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <CategoryBadge>{request.category}</CategoryBadge>
-              <SourceBadge source={request.source} />
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                <AlertTriangle size={12} />
-                {item.issues.length === 1 ? "1 excuse" : `${item.issues.length} excuses`}
-              </span>
-            </div>
-            <textarea
-              value={request.title}
-              onChange={(e) => onTitleChange(request.id, e.target.value)}
-              aria-label={`Wording of request ${index + 1}`}
-              rows={2}
-              maxLength={1000}
-              className="w-full rounded-md border border-slate-300 p-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              {request.authority} &middot; {request.period}
-            </p>
-
-            {item.issues.map((issue) => (
-              <div key={issue.code} className="mt-3 rounded-md bg-amber-50 p-3 text-[13px]">
-                <p className="flex items-center gap-1.5 font-medium text-amber-900">
-                  <Gavel size={13} />
-                  The officer could reply:
-                </p>
-                <p className="mt-1 italic text-amber-900">&ldquo;{issue.officerSays}&rdquo;</p>
-                <p className="mt-2 text-slate-700">
-                  <span className="font-medium">Why this works:</span> {issue.why}{" "}
-                  <span className="text-slate-500">({issue.section})</span>
-                </p>
-                <p className="mt-1 text-slate-700">
-                  <span className="font-medium">How to fix it:</span> {issue.fix}
-                </p>
+                ) : (
+                  <span className="text-sm text-muted">Not checked</span>
+                )}
               </div>
-            ))}
-
-            {suggestion &&
-              (request.title === suggestion ? (
-                <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-                  <Check size={13} />
-                  Using the suggested wording
-                </p>
-              ) : (
-                <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-800">
-                    <WandSparkles size={13} />
-                    Suggested wording
-                  </p>
-                  <p className="mt-1 text-sm text-slate-900">{suggestion}</p>
-                  <button
-                    type="button"
-                    onClick={() => onTitleChange(request.id, suggestion)}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800"
-                  >
-                    <Check size={13} />
-                    Use this wording
-                  </button>
-                </div>
-              ))}
-          </div>
-        );
-      })}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
