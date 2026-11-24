@@ -215,6 +215,34 @@ def test_ocr_failure_leaves_the_page_as_pypdf_found_it(monkeypatch, tmp_path):
     assert pdf_pages(path) == [""]
 
 
+# A real Adobe Scan page whose embedded text layer pypdf decoded wrong: plenty of characters,
+# almost none of them forming a real word, so OCR_THRESHOLD_CHARS alone never catches it.
+GARBLED_PAGE = (
+    "Gxdi ent > d L2(u-4) Decay L(o) (o-3 -4) - 0- 0(-3) 82) Given: no D 08 |0-25 J0-2y E pochs "
+    "- 0,4,5,12, 15 A+ cepoch O epoch y o n, 0-08 x/0. 25) dw dL 2(o -) -8 da Pox fox n- l-2 L Cwi) "
+    "(9 6-4) e poch 5 he no x h 0 02 epoch 12 epoch is h,s :2 Srep si2e ls 5, LR decxeas ed evexy "
+    "Sepochs. At epo ch 5: i sst devcthon( 008 D-0 2) 2h ed vcton (o0290 005) SO, epoch 12 6,3)"
+)
+
+
+def test_a_page_with_a_garbled_text_layer_is_sent_to_ocr(monkeypatch, tmp_path):
+    monkeypatch.setattr(extract, "_recognize_text", lambda image_bytes: "Recovered by OCR")
+    path = tmp_path / "scan.pdf"
+    path.write_bytes(make_pdf([[GARBLED_PAGE]]))
+
+    assert pdf_pages(path) == ["Recovered by OCR"]
+
+
+def test_a_short_unusual_page_is_not_mistaken_for_garbled(monkeypatch, tmp_path):
+    monkeypatch.setattr(extract, "_recognize_text", lambda image_bytes: "should never appear")
+    path = tmp_path / "real.pdf"
+    # Fewer than GARBLED_MIN_WORDS words and no common function words, but genuinely just a
+    # short heading -- too little text to judge the ratio, so it is trusted as-is.
+    path.write_bytes(make_pdf([["CPWD Works Manual 2014 Chapter Nine Annexure Twelve"]]))
+
+    assert "should never appear" not in pdf_pages(path)[0]
+
+
 # --- HTML -------------------------------------------------------------------------------------
 
 PAGE = b"""<html><head><title>Site title</title><style>p {color: red}</style></head>
