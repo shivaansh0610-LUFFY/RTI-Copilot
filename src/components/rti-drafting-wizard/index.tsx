@@ -323,7 +323,7 @@ export default function RtiDraftingWizard({
         </div>
       )}
 
-      <StepCard>
+      <StepCard wide={step === "draft"}>
         <StepCardBody>
           {step === "describe" && (
             <DescribeStep

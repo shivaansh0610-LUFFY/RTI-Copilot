@@ -1,10 +1,8 @@
 import {
   AlertTriangle,
-  CalendarClock,
   Check,
   Copy,
   Eye,
-  FileText,
   FlaskConical,
   Gavel,
   Loader2,
@@ -23,9 +21,11 @@ import type {
   ClarifyQuestion,
   DraftLanguage,
   DraftResult,
+  DraftReview,
   InformationRequest,
   PreflightResult,
 } from "../../types";
+import { PaperCard, Sheet, Stamp } from "../layout/Paper";
 import { MULTI_SELECT_SEPARATOR } from "./constants";
 import { INSPECTION_IDS, type InspectionKind } from "./inspection";
 import type { IssueLocation } from "./location";
@@ -646,6 +646,10 @@ export function ApplicantDetailsStep({
   );
 }
 
+// A warning on the paper: amber, like a sticky note.
+const NOTICE =
+  "flex max-w-3xl items-start gap-2.5 rounded-lg border border-[#f0d9a8] bg-[#fff8e8] p-4 text-[14px] text-[#7a4508]";
+
 const LANGUAGES: { code: DraftLanguage; label: string }[] = [
   { code: "en", label: "English" },
   { code: "hi", label: "हिंदी" },
@@ -679,6 +683,8 @@ export function DraftStep({
   onUseText?: (text: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  // The PIO review of the text on the sheet, once it has run: its score is stamped on the sheet.
+  const [review, setReview] = useState<DraftReview | undefined>();
   const flaggedTitles = requests.filter((request) => draft.flaggedRequestIds.includes(request.id));
   const today = new Date();
   // Photos are listed and previewed separately below, and attached as their own pages when
@@ -707,19 +713,19 @@ export function DraftStep({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-6">
       {draft.overLimit && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" />
-          <p className="text-[13px] text-amber-800">{draft.warning}</p>
+        <div className={NOTICE}>
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <p>{draft.warning}</p>
         </div>
       )}
 
       {flaggedTitles.length > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
-          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" />
-          <div className="text-[13px] text-amber-800">
-            <p className="font-medium">These requests may still be too vague for a PIO to act on:</p>
+        <div className={NOTICE}>
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">These requests may still be too vague for a PIO to act on:</p>
             <ul className="mt-1 list-inside list-disc">
               {flaggedTitles.map((request) => (
                 <li key={request.id}>{request.title}</li>
@@ -729,96 +735,118 @@ export function DraftStep({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div role="group" aria-label="Draft language" className="flex gap-1">
-          {LANGUAGES.map(({ code, label }) => (
-            <button
-              key={code}
-              type="button"
-              aria-pressed={language === code}
-              disabled={isUpdating}
-              onClick={() => code !== language && onLanguageChange(code)}
-              className={
-                "rounded-full border px-3 py-1 text-xs font-medium disabled:opacity-60 " +
-                (language === code
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-300 text-slate-700")
-              }
-            >
-              {label}
-            </button>
-          ))}
-          {isUpdating && <Loader2 size={14} className="ml-1 animate-spin self-center text-slate-500" />}
-        </div>
-        <div className="flex gap-2">
-          <SecondaryButton onClick={copyDraft} disabled={isUpdating}>
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? "Copied" : "Copy draft"}
-          </SecondaryButton>
-          <SecondaryButton onClick={printDraft} disabled={isUpdating} aria-label="Print or save as PDF">
-            <Printer size={14} />
-            PDF
-          </SecondaryButton>
-        </div>
-      </div>
-      <p className="-mt-2 text-xs text-slate-400">
-        &quot;Copy draft&quot; copies the full letter shown below as text (paste it into Word or
-        an email). &quot;PDF&quot; saves the same letter, with any photos attached as extra pages,
-        as a file. Filing on the online portal instead? Its own text box only wants the numbered
-        request paragraphs -- select and copy just that part below.
-      </p>
-
-      {/* Shown like the page it becomes: a readable font, not code. */}
-      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 sm:p-4">
-        <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
-          <FileText size={14} />
-          Your application
-        </div>
-        <p className="mb-2 text-center text-sm font-semibold text-slate-900">{heading}</p>
-        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-800">
-          {fullLetter}
-        </pre>
-      </div>
-      <p className="text-right text-xs text-slate-400">
-        {draft.charCount.toLocaleString()} / 3,000 characters in the request text above (the
-        portal box&apos;s limit)
-      </p>
-
-      {photos.length > 0 && (
-        <div className="rounded-md border border-slate-200 p-3">
-          <p className="mb-2 text-[13px] font-medium text-slate-900">
-            Enclosure{photos.length > 1 ? "s" : ""}: {photos.length} photograph
-            {photos.length > 1 ? "s" : ""} of the issue
+      {/* On a wide screen: the sheet, with the review under it and the panel to send it beside
+          both. On a phone the panel comes straight after the sheet. */}
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-x-11">
+        <div className="flex min-w-0 flex-col gap-3">
+          {/* Shown like the page it becomes: a serif letter on a white sheet, not code. */}
+          <Sheet label="Your application" className="px-5 pb-12 pt-14 sm:px-12 sm:pb-16 lg:px-16">
+            <p className="mb-5 text-center font-serif text-[15px] font-bold text-ink sm:text-base">{heading}</p>
+            <pre className="whitespace-pre-wrap break-words font-serif text-[14px] leading-[1.75] text-ink sm:text-[15px]">
+              {fullLetter}
+            </pre>
+            {review && (
+              <Stamp
+                top={review.verdict === "ready" ? "PIO-PROOF" : "PIO SCORE"}
+                main={`${review.score}/${review.outOf}`}
+                className="absolute bottom-5 right-4 sm:bottom-12 sm:right-12"
+              />
+            )}
+          </Sheet>
+          <p className="text-right text-xs text-muted">
+            {draft.charCount.toLocaleString()} / 3,000 characters in the request text above (the
+            portal box&apos;s limit)
           </p>
-          <div className="flex flex-wrap gap-2">
-            {photos.map((photo, index) => (
-              <EnclosurePhoto key={`${photo.name}-${index}`} photo={photo} />
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Listed on the printed copy as an enclosure. Attach the actual photo(s) yourself when
-            you file -- they stay on this device and are never uploaded.
-          </p>
+
+          {photos.length > 0 && (
+            <div className="rounded-lg border border-edge bg-card p-4">
+              <p className="mb-2.5 text-sm font-semibold text-ink">
+                Enclosure{photos.length > 1 ? "s" : ""}: {photos.length} photograph
+                {photos.length > 1 ? "s" : ""} of the issue
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {photos.map((photo, index) => (
+                  <EnclosurePhoto key={`${photo.name}-${index}`} photo={photo} />
+                ))}
+              </div>
+              <p className="mt-2.5 text-xs leading-relaxed text-muted">
+                Listed on the printed copy as an enclosure. Attach the actual photo(s) yourself when
+                you file -- they stay on this device and are never uploaded.
+              </p>
+            </div>
+          )}
         </div>
-      )}
 
-      <PioReview text={draft.draftText} onUse={onUseText} />
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <PaperCard title="Send it">
+            <div className="flex items-center gap-2">
+              <div
+                role="group"
+                aria-label="Draft language"
+                className="inline-flex rounded-full border border-edge-strong bg-white p-[3px]"
+              >
+                {LANGUAGES.map(({ code, label }) => (
+                  <button
+                    key={code}
+                    type="button"
+                    aria-pressed={language === code}
+                    disabled={isUpdating}
+                    onClick={() => code !== language && onLanguageChange(code)}
+                    className={
+                      "min-h-9 rounded-full px-4 text-sm font-medium transition-colors disabled:opacity-60 " +
+                      (language === code ? "bg-ink text-white" : "text-ink-2 hover:bg-ink/5")
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {isUpdating && <Loader2 size={16} className="animate-spin text-muted" />}
+            </div>
+            <div className="mt-3.5 flex gap-2.5">
+              <SecondaryButton onClick={copyDraft} disabled={isUpdating} className="flex-1 px-3">
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+                {copied ? "Copied" : "Copy draft"}
+              </SecondaryButton>
+              <SecondaryButton
+                onClick={printDraft}
+                disabled={isUpdating}
+                aria-label="Print or save as PDF"
+                className="flex-1 px-3"
+              >
+                <Printer size={16} />
+                PDF
+              </SecondaryButton>
+            </div>
+            <p className="mt-3 text-[13px] leading-relaxed text-muted">
+              &quot;Copy draft&quot; copies the full letter as text (paste it into Word or an
+              email). &quot;PDF&quot; saves the same letter, with any photos attached as extra
+              pages, as a file. Filing on the online portal instead? Its own text box only wants
+              the numbered request paragraphs: select and copy just that part.
+            </p>
+          </PaperCard>
 
-      <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-[13px] text-blue-900">
-        <CalendarClock size={16} className="mt-0.5 shrink-0" />
-        <div>
-          <p className="font-medium">If you file today ({dateAfter(today, 0)}):</p>
-          <ul className="mt-1 list-inside list-disc">
-            <li>The PIO must reply by {dateAfter(today, 30)} (Section 7(1)).</li>
-            <li>
-              No reply, or an incomplete one? You can file a first appeal until{" "}
-              {dateAfter(today, 60)} (Section 19(1): within 30 days of the deadline or the reply).
-            </li>
-          </ul>
+          <PaperCard tone="blue" title={`If you file today, ${dateAfter(today, 0)}`}>
+            <ul className="flex flex-col gap-2 text-[14px] leading-relaxed text-ink-2">
+              <li>
+                The PIO must reply by <b className="font-semibold text-ink">{dateAfter(today, 30)}</b>{" "}
+                (Section 7(1)).
+              </li>
+              <li>
+                No reply, or an incomplete one? You can file a first appeal until{" "}
+                <b className="font-semibold text-ink">{dateAfter(today, 60)}</b> (Section 19(1): within
+                30 days of the deadline or the reply).
+              </li>
+            </ul>
+          </PaperCard>
+        </aside>
+
+        <div className="min-w-0 lg:col-start-1">
+          <PioReview text={draft.draftText} onUse={onUseText} onReview={setReview} />
         </div>
       </div>
 
-      <p className="text-[13px] text-slate-500">
+      <p className="max-w-3xl text-[13.5px] leading-relaxed text-muted">
         Read the draft before you file it: RTI Copilot is an assistant, not legal advice. You file
         the application yourself, online on the Delhi Government&apos;s RTI portal or by post to
         the PIO. RTI Copilot never submits applications or stores your portal credentials.
@@ -834,7 +862,7 @@ function EnclosurePhoto({ photo }: { photo: File }) {
     <img
       src={url}
       alt="An enclosed photo of the issue"
-      className="h-16 w-16 rounded-md border border-slate-200 object-cover"
+      className="h-16 w-16 rounded-md border border-edge object-cover"
     />
   );
 }

@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, CheckCircle2, Loader2, ShieldCheck, Sparkles, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DraftReview, ReviewCheck } from "../../types";
 import { PrimaryButton, SecondaryButton } from "../rti-drafting-wizard/ui";
 import { reviewDraft, ReviewUnavailable } from "./api";
@@ -14,7 +14,16 @@ const VERDICT: Record<DraftReview["verdict"], { text: string; ring: string; tone
 // Reads an application the way a Public Information Officer would and scores it out of 10
 // (POST /review-draft). Shown under the draft, and on its own page for pasted applications.
 // The review belongs to the text it was made for: change the text and it asks to check again.
-export default function PioReview({ text, onUse }: { text: string; onUse?: (text: string) => void }) {
+// `onReview` hears the review of the current text, or undefined (none yet, or the text changed).
+export default function PioReview({
+  text,
+  onUse,
+  onReview,
+}: {
+  text: string;
+  onUse?: (text: string) => void;
+  onReview?: (review: DraftReview | undefined) => void;
+}) {
   const [result, setResult] = useState<{ text: string; review: DraftReview } | undefined>();
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
@@ -22,6 +31,10 @@ export default function PioReview({ text, onUse }: { text: string; onUse?: (text
 
   const review = result && result.text === text ? result.review : undefined;
   const isStale = result !== undefined && result.text !== text;
+
+  useEffect(() => {
+    onReview?.(review);
+  }, [review, onReview]);
 
   function check() {
     setChecking(true);
