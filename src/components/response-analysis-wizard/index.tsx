@@ -134,6 +134,7 @@ export default function ResponseAnalysisWizard({
       <PageHeader
         eyebrow={`Step ${stepIndex + 1} of ${ANALYSIS_STEPS.length} · ${ANALYSIS_STEPS[stepIndex].label}`}
         title="Analyse the reply"
+        accent="reply"
         intro={
           isReal
             ? `Upload the reply you received. Each of your ${requests.length} request${requests.length === 1 ? " is" : "s are"} checked against it.`

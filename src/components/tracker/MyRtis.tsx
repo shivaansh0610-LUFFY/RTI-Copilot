@@ -21,6 +21,7 @@ export default function MyRtis({
       <PageHeader
         eyebrow="Saved in this browser only"
         title="My RTIs"
+        accent="RTIs"
         intro="After you file, add the date and registration number to see when the reply is due and until when you can appeal."
       />
 

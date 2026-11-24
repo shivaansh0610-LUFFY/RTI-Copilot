@@ -306,6 +306,7 @@ export default function RtiDraftingWizard({
       <PageHeader
         eyebrow={`Step ${stepNumber} of ${ALL_STEPS.length} · ${stepLabel}`}
         title={followUp ? "Draft your follow-up RTI" : "Draft your RTI application"}
+        accent="RTI"
         intro="Turn your complaint into an application that asks for the exact records PWD must keep."
       />
 

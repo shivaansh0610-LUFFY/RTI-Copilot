@@ -110,7 +110,7 @@ test("'Check my draft' and the header both open the PIO review page, which keeps
   render(<App />);
 
   fireEvent.click(homeButton(/check my draft/i));
-  expect(screen.getByRole("heading", { name: "Check an RTI application" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Check it like a PIO" })).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Your application"), { target: { value: "1. Copy of the work order" } });
 
   fireEvent.click(screen.getByRole("button", { name: "RTI Copilot" }));

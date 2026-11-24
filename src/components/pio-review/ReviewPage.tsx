@@ -12,8 +12,9 @@ export default function ReviewPage() {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="PIO review"
-        title="Check an RTI application"
+        eyebrow="Check a draft · PIO review"
+        title="Check it like a PIO"
+        accent="PIO"
         intro="Paste an RTI application, written here or anywhere else. RTI Copilot reads it like a reluctant Public Information Officer, scores it out of 10, and suggests a safer version."
       />
       <div className="flex flex-col gap-1.5">
