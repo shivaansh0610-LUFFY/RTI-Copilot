@@ -39,6 +39,7 @@
 }
 
 .collage {
+  --drift-scale: 1;
   position: relative;
   height: clamp(440px, 50vw, 720px);
 }
@@ -48,6 +49,11 @@
   object-fit: cover;
   /* --drift runs from -0.5 to 0.5 as the collage crosses the window; --shift is how far
      this photo travels over that distance. */
-  transform: translate3d(calc(var(--drift, 0) * var(--shift, 0px)), 0, 0);
-  will-change: transform;
+  transform: translate3d(calc(var(--drift, 0) * var(--shift, 0px) * var(--drift-scale)), 0, 0);
+}
+
+@media (max-width: 640px) {
+  .collage {
+    --drift-scale: 0.35;
+  }
 }

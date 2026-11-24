@@ -55,7 +55,8 @@
 }
 
 .records-inspect {
-  margin-top: 10px;
+  align-self: flex-start;
+  margin-top: 14px;
   font-size: 15px;
   text-align: left;
 }

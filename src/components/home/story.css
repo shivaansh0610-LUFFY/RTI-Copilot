@@ -150,10 +150,9 @@
   background: rgba(28, 25, 23, 0.06);
 }
 
+/* A text link that may wrap: inline, so its arrow follows the last word. */
 .story-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: inline-block;
   padding: 6px 0;
   border: 0;
   background: none;
@@ -168,6 +167,17 @@
 
 .story-link:hover {
   text-decoration-thickness: 2px;
+}
+
+/* Keeps an arrow on the same line as the word before it. */
+.story-nowrap {
+  white-space: nowrap;
+}
+
+.story-link svg {
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: -3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

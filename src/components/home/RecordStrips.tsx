@@ -26,18 +26,19 @@ export default function RecordStrips({ onStart }: { onStart: (starter?: string) 
               <path d="M76 88l-8 5M110 84l6-3M94 81l1-6" />
               <path d="M4 92h110" />
             </svg>
-            <div>
-              <p>
-                Section 2(j) of the RTI Act lets you ask for copies of records, inspect the work
-                itself, and take certified samples of the material used.{" "}
-                <span className="records-muted">(Open each record.)</span>
-              </p>
-              <button type="button" onClick={() => onStart(REPAIR_STARTER)} className="story-link records-inspect">
-                A repair broke again? Start with an inspection
-                <ArrowRight size={16} aria-hidden="true" />
-              </button>
-            </div>
+            <p>
+              Section 2(j) of the RTI Act lets you ask for copies of records, inspect the work
+              itself, and take certified samples of the material used.{" "}
+              <span className="records-muted">(Open each record.)</span>
+            </p>
           </div>
+          <button type="button" onClick={() => onStart(REPAIR_STARTER)} className="story-link records-inspect">
+            A repair broke again? Start with an{" "}
+            <span className="story-nowrap">
+              inspection
+              <ArrowRight size={16} aria-hidden="true" />
+            </span>
+          </button>
         </div>
 
         <div data-reveal className="records-reveal">
