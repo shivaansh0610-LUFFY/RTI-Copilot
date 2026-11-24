@@ -1,5 +1,42 @@
 @import "tailwindcss";
 
+/* The home page's paper, inks and typefaces, as Tailwind colours and fonts for every other page
+   (bg-paper, text-ink, border-edge, font-title...). The home page keeps the same values in
+   story.css. The greys are warm: `muted` replaces slate-500 and passes 4.5:1 on paper. */
+@theme {
+  --color-paper: #f6f1e7;
+  --color-paper-light: #fbf8f2;
+  --color-paper-warm: #f3ede2;
+  --color-paper-deep: #ede5d3;
+  --color-card: #fffdf8;
+  --color-rule: #efe7d8;
+  --color-edge: #e4d9c3;
+  --color-edge-strong: #d3c5a8;
+  --color-faint: #8a8178;
+  --color-muted: #6b635b;
+  --color-ink: #1c1917;
+  --color-ink-2: #2e2a26;
+  --color-ink-3: #4a4540;
+  --color-ink-blue: #1f3a8a;
+  --color-ink-blue-deep: #13245a;
+  --color-ink-blue-wash: #f4f6fc;
+  --color-khaki: #c9a66b;
+  --color-brown: #6b5330;
+  --color-stamp: #b42318;
+  --color-pen: #7a2a20;
+  --color-leaf: #146c37;
+  --color-leaf-wash: #f3fbf5;
+
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-serif: "Noto Serif", Georgia, serif;
+  --font-title: "Khand", "IBM Plex Sans", system-ui, sans-serif;
+  --font-hand: "Kalam", "Comic Sans MS", cursive;
+}
+
 body {
   margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
 }

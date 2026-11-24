@@ -79,7 +79,7 @@ function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-paper font-sans text-ink">
       <SiteHeader view={view} rtiCount={rtis.length} onNavigate={navigate} />
 
       {view === "home" && (
