@@ -1,6 +1,7 @@
 import { ArrowRight, CornerDownRight, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type {
+  ApplicantDetails,
   ClarifyQuestion,
   DraftLanguage,
   DraftResult,
@@ -18,6 +19,7 @@ import {
   getClarifyQuestions,
 } from "./mocks";
 import {
+  ApplicantDetailsStep,
   ClarifyStep,
   DescribeStep,
   DraftStep,
@@ -57,9 +59,9 @@ export default function RtiDraftingWizard({
       : (starter ?? ""),
   );
   const [grievanceError, setGrievanceError] = useState("");
-  // The photo never leaves this browser. The location reaches the backend only as the
+  // The photos never leave this browser. The location reaches the backend only as the
   // "Location:" line kept in `grievance`.
-  const [photo, setPhoto] = useState<File | undefined>();
+  const [photos, setPhotos] = useState<File[]>([]);
   const [issueLocation, setIssueLocation] = useState<IssueLocation | undefined>();
 
   const [clarifyQuestions, setClarifyQuestions] = useState<ClarifyQuestion[]>([]);
@@ -71,6 +73,15 @@ export default function RtiDraftingWizard({
   const [requests, setRequests] = useState<InformationRequest[]>(followUp?.requests ?? []);
   const [requestsError, setRequestsError] = useState("");
   const [carriedRequests, setCarriedRequests] = useState<InformationRequest[]>([]);
+  const [applicantDetails, setApplicantDetails] = useState<ApplicantDetails>({
+    name: "",
+    relation: "son",
+    relativeName: "",
+    address: "",
+    phone: "",
+    mobile: "",
+  });
+  const [applicantError, setApplicantError] = useState("");
   const [draft, setDraft] = useState<DraftResult | undefined>();
   const [draftError, setDraftError] = useState("");
   const [language, setLanguage] = useState<DraftLanguage>("en");
@@ -78,17 +89,18 @@ export default function RtiDraftingWizard({
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const needsQualityReview = useMemo(
-    () => carriedRequests.some((r) => r.quality === "needs-detail"),
-    [carriedRequests],
-  );
+  // Before the requests step settles (quality-review or draft), there is no carriedRequests yet
+  // to check -- predict from the live requests instead, so the step list shown while still on
+  // Describe/Clarify/Requests already matches what Continue will actually do, instead of
+  // optimistically showing "Quality review" and then dropping it once it turns out not needed.
+  const needsQualityReview = useMemo(() => {
+    const checked = step === "quality-review" || step === "draft" ? carriedRequests : requests;
+    return checked.some((r) => r.quality === "needs-detail");
+  }, [step, requests, carriedRequests]);
 
   const visibleSteps = useMemo(
-    () =>
-      step === "describe" || step === "clarify" || step === "requests"
-        ? ALL_STEPS
-        : ALL_STEPS.filter((s) => s.id !== "quality-review" || needsQualityReview),
-    [step, needsQualityReview],
+    () => ALL_STEPS.filter((s) => s.id !== "quality-review" || needsQualityReview),
+    [needsQualityReview],
   );
 
   const stepNumber = visibleSteps.findIndex((s) => s.id === step) + 1;
@@ -115,7 +127,7 @@ export default function RtiDraftingWizard({
     setIsLoading(true);
     createCase(grievance)
       .then((newCaseId) =>
-        getClarifyQuestions(newCaseId).then((result) => {
+        getClarifyQuestions(newCaseId, grievance).then((result) => {
           setCaseId(newCaseId);
           // Anything the grievance already stated is pre-filled, not asked again.
           const mergedAnswers = { ...clarificationAnswers, ...result.answers };
@@ -202,11 +214,20 @@ export default function RtiDraftingWizard({
     if (requests.some((r) => r.quality === "needs-detail")) {
       setStep("quality-review");
     } else {
-      requestDraft(requests, language);
+      setStep("applicant-details");
     }
   }
 
   function handleQualityReviewContinue() {
+    setStep("applicant-details");
+  }
+
+  function handleApplicantDetailsContinue() {
+    if (!applicantDetails.name.trim() || !applicantDetails.relativeName.trim() || !applicantDetails.address.trim()) {
+      setApplicantError("Please fill in your name, relative's name and address to continue.");
+      return;
+    }
+    setApplicantError("");
     requestDraft(carriedRequests, language);
   }
 
@@ -219,7 +240,8 @@ export default function RtiDraftingWizard({
     if (step === "clarify") setStep("describe");
     else if (step === "requests") setStep("clarify");
     else if (step === "quality-review") setStep("requests");
-    else if (step === "draft") setStep(needsQualityReview ? "quality-review" : "requests");
+    else if (step === "applicant-details") setStep(needsQualityReview ? "quality-review" : "requests");
+    else if (step === "draft") setStep("applicant-details");
   }
 
   return (
@@ -250,8 +272,8 @@ export default function RtiDraftingWizard({
               grievance={grievance}
               onChange={setGrievance}
               error={grievanceError}
-              photo={photo}
-              onPhotoChange={setPhoto}
+              photos={photos}
+              onPhotosChange={setPhotos}
               location={issueLocation}
               onLocationChange={handleLocationChange}
             />
@@ -285,10 +307,20 @@ export default function RtiDraftingWizard({
             />
           )}
 
+          {step === "applicant-details" && (
+            <ApplicantDetailsStep
+              details={applicantDetails}
+              onChange={setApplicantDetails}
+              error={applicantError}
+            />
+          )}
+
           {step === "draft" && draft && (
             <DraftStep
               draft={draft}
               requests={carriedRequests}
+              photos={photos}
+              applicant={applicantDetails}
               language={language}
               onLanguageChange={(next) => requestDraft(carriedRequests, next)}
               isUpdating={isLoading}
@@ -323,6 +355,12 @@ export default function RtiDraftingWizard({
           )}
           {step === "quality-review" && (
             <PrimaryButton onClick={handleQualityReviewContinue} disabled={isLoading}>
+              {isLoading && <Loader2 size={14} className="animate-spin" />}
+              Continue
+            </PrimaryButton>
+          )}
+          {step === "applicant-details" && (
+            <PrimaryButton onClick={handleApplicantDetailsContinue} disabled={isLoading}>
               {isLoading && <Loader2 size={14} className="animate-spin" />}
               Continue
             </PrimaryButton>
