@@ -18,7 +18,7 @@ import type { LocationPicker } from "./use-location-picker";
 import { useObjectUrl } from "./use-object-url";
 
 const CHIP =
-  "flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-400";
+  "flex min-h-9 items-center gap-1.5 rounded-full border border-edge-strong bg-white px-3 text-[13px] font-medium text-ink-3 hover:border-ink-3";
 
 // A GPS fix this loose could be the wrong street; ask the citizen to check the pin.
 const LOOSE_FIX_METERS = 100;
@@ -73,10 +73,10 @@ export function PhotoLocation({
   return (
     <section
       aria-label="Photo and location"
-      className="flex flex-col gap-3 rounded-md border border-slate-200 p-3"
+      className="mt-2 flex flex-col gap-3 rounded-lg border border-edge bg-card p-4"
     >
-      <p className="text-[13px] font-medium text-slate-900">
-        Add a photo <span className="font-normal text-slate-500">(optional, up to {MAX_PHOTOS})</span>
+      <p className="text-sm font-semibold text-ink">
+        Add a photo <span className="font-normal text-muted">(optional, up to {MAX_PHOTOS})</span>
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -109,7 +109,7 @@ export function PhotoLocation({
         className="hidden"
       />
 
-      {photoError && <p className="text-[13px] text-amber-600">{photoError}</p>}
+      {photoError && <p className="text-[13px] text-[#8a4b08]">{photoError}</p>}
       {photos.length > 0 && (
         <div className="flex flex-col gap-2">
           {photos.map((photo, index) => (
@@ -120,21 +120,21 @@ export function PhotoLocation({
 
       <div aria-live="polite" className="flex flex-col gap-1.5">
         {picker.isLocating && (
-          <p className="flex items-center gap-1.5 text-[13px] text-slate-600">
+          <p className="flex items-center gap-1.5 text-[13px] text-ink-3">
             <Loader2 size={13} className="animate-spin" />
             Finding your location. If your browser asks, choose Allow.
           </p>
         )}
 
         {location && (
-          <div className="flex flex-col gap-1 text-[13px] text-slate-700">
+          <div className="flex flex-col gap-1 text-[13px] text-ink-2">
             <p className="flex items-start gap-1.5">
-              <MapPin size={14} className="mt-0.5 shrink-0 text-red-600" />
+              <MapPin size={14} className="mt-0.5 shrink-0 text-stamp" />
               <span>
                 {location.address ??
                   (picker.isLookingUp ? "Looking up the street name…" : formatCoordinates(location))}
                 {location.accuracyMeters !== undefined && (
-                  <span className="text-slate-500">
+                  <span className="text-muted">
                     {" "}
                     · GPS accuracy about {Math.round(location.accuracyMeters)} m
                   </span>
@@ -146,7 +146,7 @@ export function PhotoLocation({
                 href={googleMapsUrl(location)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-blue-700 underline"
+                className="inline-flex items-center gap-1 font-medium text-ink-blue underline underline-offset-2"
               >
                 Check in Google Maps
                 <ExternalLink size={12} />
@@ -154,7 +154,7 @@ export function PhotoLocation({
               <button
                 type="button"
                 onClick={picker.clear}
-                className="inline-flex items-center gap-1 text-slate-600 underline"
+                className="inline-flex items-center gap-1 text-ink-3 underline"
               >
                 <X size={12} />
                 Clear location
@@ -164,7 +164,7 @@ export function PhotoLocation({
         )}
 
         {location?.accuracyMeters !== undefined && location.accuracyMeters > NETWORK_FIX_METERS && (
-          <p className="flex items-start gap-1.5 text-[13px] text-amber-600">
+          <p className="flex items-start gap-1.5 text-[13px] text-[#8a4b08]">
             <AlertTriangle size={14} className="mt-0.5 shrink-0" />
             This doesn&apos;t look like your real spot -- your browser guessed it from your internet
             connection, not GPS. Please mention the exact location in your description instead.
@@ -173,19 +173,19 @@ export function PhotoLocation({
         {location?.accuracyMeters !== undefined &&
           location.accuracyMeters > LOOSE_FIX_METERS &&
           location.accuracyMeters <= NETWORK_FIX_METERS && (
-            <p className="text-[13px] text-amber-600">
+            <p className="text-[13px] text-[#8a4b08]">
               This position is only approximate -- mention the exact spot in your description if it matters.
             </p>
           )}
         {location &&
           isClearlyOutsideDelhi(location) &&
           (location.accuracyMeters ?? 0) <= NETWORK_FIX_METERS && (
-            <p className="flex items-start gap-1.5 text-[13px] text-amber-600">
+            <p className="flex items-start gap-1.5 text-[13px] text-[#8a4b08]">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               This spot looks to be outside Delhi, so a Delhi department may not be responsible for it.
             </p>
           )}
-        {picker.message && <p className="text-[13px] text-amber-600">{picker.message}</p>}
+        {picker.message && <p className="text-[13px] text-[#8a4b08]">{picker.message}</p>}
       </div>
     </section>
   );
@@ -199,11 +199,11 @@ function PhotoPreview({ photo, onRemove }: { photo: File; onRemove: () => void }
         <img
           src={url}
           alt="The photo you added"
-          className="h-20 w-20 shrink-0 rounded-md border border-slate-200 object-cover"
+          className="h-20 w-20 shrink-0 rounded-md border border-edge object-cover"
         />
       )}
       <div className="flex flex-col items-start gap-1">
-        <p className="text-[13px] text-slate-700">
+        <p className="text-[13px] text-ink-2">
           Photo added. It stays on this device and isn&apos;t sent anywhere -- it's listed as an
           enclosure on the draft, and the Draft step lets you print or save it alongside the
           application, but you attach it yourself when you file.
@@ -211,7 +211,7 @@ function PhotoPreview({ photo, onRemove }: { photo: File; onRemove: () => void }
         <button
           type="button"
           onClick={onRemove}
-          className="inline-flex items-center gap-1 text-[13px] text-slate-600 underline"
+          className="inline-flex items-center gap-1 text-[13px] text-ink-3 underline"
         >
           <X size={12} />
           Remove photo

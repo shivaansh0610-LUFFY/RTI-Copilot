@@ -61,15 +61,15 @@ export function DescribeStep({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label htmlFor="grievance" className="font-serif text-[17px] font-semibold text-ink">
           Describe your issue in plain language
         </label>
         <button
           type="button"
           onClick={picker.locateDevice}
           disabled={picker.isLocating}
-          className="flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:border-slate-400 disabled:opacity-60"
+          className="flex min-h-9 items-center gap-1.5 rounded-full border border-edge-strong bg-card px-3 text-[13px] font-medium text-ink-3 hover:border-ink-3 disabled:opacity-60"
         >
           {picker.isLocating ? (
             <Loader2 size={13} className="animate-spin" />
@@ -80,15 +80,16 @@ export function DescribeStep({
         </button>
       </div>
       <textarea
+        id="grievance"
         value={grievance}
         onChange={(e) => onChange(e.target.value)}
-        rows={6}
+        rows={7}
         // The API takes 5,000 characters; this leaves room for the "Location:" line the map adds.
         maxLength={4800}
         placeholder="e.g. The road in front of my house has been broken for two years and no one has repaired it..."
-        className="rounded-md border border-slate-300 p-3 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+        className="paper-field p-4 font-serif text-[15.5px] leading-relaxed"
       />
-      {error && <p className="text-[13px] text-red-600">{error}</p>}
+      {error && <p className="text-[13.5px] font-medium text-stamp">{error}</p>}
       <PhotoLocation
         photos={photos}
         onPhotosChange={onPhotosChange}
@@ -111,17 +112,17 @@ export function ClarifyStep({
   error: string;
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       {questions.map((question) => {
         const chosen = question.multi
           ? answers[question.key]?.split(MULTI_SELECT_SEPARATOR).filter(Boolean) ?? []
           : [];
         return (
           <div key={question.key} className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-900">
+            <label className="font-serif text-[17px] font-semibold text-ink">
               {question.question}
               {question.multi && (
-                <span className="ml-1.5 font-normal text-slate-500">(choose all that apply)</span>
+                <span className="ml-1.5 font-sans text-sm font-normal text-muted">(choose all that apply)</span>
               )}
             </label>
             <div className="flex flex-wrap gap-2">
@@ -143,10 +144,10 @@ export function ClarifyStep({
                       onSelect(question.key, next.join(MULTI_SELECT_SEPARATOR));
                     }}
                     className={
-                      "rounded-full border px-3 py-1.5 text-sm " +
+                      "min-h-10 rounded-full border px-4 text-[14.5px] transition-colors " +
                       (isSelected
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-300 text-slate-700")
+                        ? "border-ink-blue bg-ink-blue font-medium text-white"
+                        : "border-edge-strong bg-card text-ink-2 hover:border-ink-3")
                     }
                   >
                     {option}
@@ -158,7 +159,7 @@ export function ClarifyStep({
         );
       })}
 
-      {error && <p className="text-[13px] text-red-600">{error}</p>}
+      {error && <p className="text-[13.5px] font-medium text-stamp">{error}</p>}
     </div>
   );
 }
@@ -208,7 +209,7 @@ export function RequestsStep({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-slate-500">
+      <p className="text-[15px] leading-relaxed text-ink-3">
         {isFollowUp
           ? "These requests were not fully answered in the earlier reply. Review them, remove any you no longer need, or add more."
           : "Your grievance has been broken down into the following structured information requests. Remove any you don't need, or add your own."}
@@ -218,7 +219,7 @@ export function RequestsStep({
       ))}
 
       {requests.length === 0 && (
-        <p className="rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">
+        <p className="rounded-lg border border-dashed border-edge-strong p-5 text-center text-sm text-muted">
           No requests yet. Add at least one to continue.
         </p>
       )}
@@ -233,9 +234,9 @@ export function RequestsStep({
       />
 
       {isAdding ? (
-        <div className="flex flex-col gap-3 rounded-md border border-slate-300 p-4">
+        <div className="flex flex-col gap-4 rounded-lg border border-edge bg-card p-4 sm:p-5">
           <div className="flex flex-col gap-1">
-            <label htmlFor="custom-request-title" className="text-sm font-medium text-slate-900">
+            <label htmlFor="custom-request-title" className="text-sm font-semibold text-ink">
               What information do you want?
             </label>
             <textarea
@@ -245,16 +246,16 @@ export function RequestsStep({
               rows={2}
               maxLength={1000}
               placeholder="e.g. Name of the contractor and the date the repair work was completed"
-              className="rounded-md border border-slate-300 p-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+              className="paper-field p-3 text-sm leading-relaxed"
             />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs leading-relaxed text-muted">
               Ask for specific records or facts (copies, dates, amounts, names) rather than
               opinions or explanations, so the authority can't easily deny it.
             </p>
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="custom-request-category" className="text-sm font-medium text-slate-900">
-              Category <span className="font-normal text-slate-400">(optional)</span>
+            <label htmlFor="custom-request-category" className="text-sm font-semibold text-ink">
+              Category <span className="font-normal text-muted">(optional)</span>
             </label>
             <input
               id="custom-request-category"
@@ -263,10 +264,10 @@ export function RequestsStep({
               onChange={(e) => setCategory(e.target.value)}
               maxLength={80}
               placeholder="e.g. Contract, Expenditure, Attendance"
-              className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+              className="paper-field min-h-11 px-3 text-sm"
             />
           </div>
-          {formError && <p className="text-[13px] text-red-600">{formError}</p>}
+          {formError && <p className="text-[13.5px] font-medium text-stamp">{formError}</p>}
           <div className="flex justify-end gap-2">
             <SecondaryButton onClick={resetForm} disabled={isSaving}>
               Cancel
@@ -281,14 +282,14 @@ export function RequestsStep({
         <button
           type="button"
           onClick={() => setIsAdding(true)}
-          className="flex items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 p-3 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-white"
+          className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-dashed border-edge-strong p-3 text-[15px] font-medium text-ink-2 hover:border-ink-3 hover:bg-card"
         >
           <Plus size={16} />
           Add your own request
         </button>
       )}
 
-      {error && <p className="text-[13px] text-red-600">{error}</p>}
+      {error && <p className="text-[13.5px] font-medium text-stamp">{error}</p>}
     </div>
   );
 }
@@ -311,19 +312,19 @@ function InspectionOffer({
   return (
     <section
       aria-labelledby="inspection-offer-heading"
-      className="rounded-md border border-emerald-200 bg-emerald-50/60 p-4"
+      className="rounded-lg border border-[#b9e2c5] bg-leaf-wash p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h3 id="inspection-offer-heading" className="text-sm font-semibold text-slate-900">
+        <h3 id="inspection-offer-heading" className="font-title text-[22px] font-bold uppercase leading-none text-leaf">
           Go beyond papers: see the work itself
         </h3>
         {suggested && (
-          <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-medium text-white">
+          <span className="rounded-full bg-leaf px-2.5 py-0.5 text-[11.5px] font-semibold text-white">
             Suggested for your complaint
           </span>
         )}
       </div>
-      <p className="mt-1 text-[13px] text-slate-700">
+      <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
         The RTI Act also lets you inspect the road work and its records, and take certified
         samples of the material used (Section 2(j)). Papers can say anything; the road can&apos;t.
       </p>
@@ -332,7 +333,7 @@ function InspectionOffer({
           added[kind] ? (
             <span
               key={kind}
-              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-800"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-[#9fd5ae] bg-white px-3.5 text-sm font-semibold text-leaf"
             >
               <Check size={14} />
               {addedLabel}
@@ -342,7 +343,7 @@ function InspectionOffer({
               key={kind}
               type="button"
               onClick={() => onAdd(kind)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700 bg-white px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-leaf bg-white px-3.5 text-sm font-semibold text-leaf hover:bg-[#e6f6ec]"
             >
               <Icon size={14} />
               {label}
@@ -350,8 +351,8 @@ function InspectionOffer({
           ),
         )}
       </div>
-      <details className="mt-3 text-[13px] text-slate-700">
-        <summary className="cursor-pointer font-medium text-emerald-800">What happens next?</summary>
+      <details className="mt-3 text-[13.5px] text-ink-2">
+        <summary className="cursor-pointer font-semibold text-leaf">What happens next?</summary>
         <ul className="mt-2 flex list-disc flex-col gap-1 pl-5">
           <li>The PIO writes to you with a date and time, and any fee with its calculation (Section 7(3)). Pay only what is asked in writing.</li>
           <li>At the inspection, an official shows you the site and the files. Take photos and notes, and ask for copies of any pages you need.</li>
@@ -408,7 +409,7 @@ export function OfficerCheckStep({
 
       {result && (
         <div role="status" className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-slate-900">
+          <p className="text-sm font-semibold text-ink">
             {flagged === 0
               ? "No easy excuses found. Your requests ask for specific records."
               : `The officer could use an excuse on ${flagged} of ${requests.length} request${requests.length === 1 ? "" : "s"}.`}
@@ -542,13 +543,13 @@ export function ApplicantDetailsStep({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-slate-500">
+      <p className="text-[15px] leading-relaxed text-ink-3">
         Used only to fill in the printed letter&apos;s particulars (the online portal has its own
         such fields). Everything here stays on this device.
       </p>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="applicant-name" className="text-sm font-medium text-slate-900">
+        <label htmlFor="applicant-name" className="text-sm font-semibold text-ink">
           Your full name
         </label>
         <input
@@ -557,12 +558,12 @@ export function ApplicantDetailsStep({
           value={details.name}
           onChange={(e) => set("name", e.target.value)}
           maxLength={200}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+          className="paper-field min-h-11 px-3 text-sm"
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-slate-900">You are the</label>
+        <label className="text-sm font-semibold text-ink">You are the</label>
         <div className="flex flex-wrap gap-2">
           {RELATIONS.map(({ value, label }) => (
             <button
@@ -571,10 +572,10 @@ export function ApplicantDetailsStep({
               aria-pressed={details.relation === value}
               onClick={() => set("relation", value)}
               className={
-                "rounded-full border px-3 py-1.5 text-sm " +
+                "min-h-10 rounded-full border px-4 text-[14.5px] transition-colors " +
                 (details.relation === value
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-300 text-slate-700")
+                  ? "border-ink-blue bg-ink-blue font-medium text-white"
+                  : "border-edge-strong bg-card text-ink-2 hover:border-ink-3")
               }
             >
               {label}
@@ -584,7 +585,7 @@ export function ApplicantDetailsStep({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="applicant-relative" className="text-sm font-medium text-slate-900">
+        <label htmlFor="applicant-relative" className="text-sm font-semibold text-ink">
           {details.relation === "wife" ? "Husband's name" : "Father's name"}
         </label>
         <input
@@ -593,12 +594,12 @@ export function ApplicantDetailsStep({
           value={details.relativeName}
           onChange={(e) => set("relativeName", e.target.value)}
           maxLength={200}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+          className="paper-field min-h-11 px-3 text-sm"
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="applicant-address" className="text-sm font-medium text-slate-900">
+        <label htmlFor="applicant-address" className="text-sm font-semibold text-ink">
           Your address
         </label>
         <textarea
@@ -607,14 +608,14 @@ export function ApplicantDetailsStep({
           onChange={(e) => set("address", e.target.value)}
           rows={2}
           maxLength={400}
-          className="rounded-md border border-slate-300 p-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+          className="paper-field p-3 text-sm leading-relaxed"
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label htmlFor="applicant-phone" className="text-sm font-medium text-slate-900">
-            Telephone <span className="font-normal text-slate-400">(optional)</span>
+          <label htmlFor="applicant-phone" className="text-sm font-semibold text-ink">
+            Telephone <span className="font-normal text-muted">(optional)</span>
           </label>
           <input
             id="applicant-phone"
@@ -622,12 +623,12 @@ export function ApplicantDetailsStep({
             value={details.phone ?? ""}
             onChange={(e) => set("phone", e.target.value)}
             maxLength={30}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+            className="paper-field min-h-11 px-3 text-sm"
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="applicant-mobile" className="text-sm font-medium text-slate-900">
-            Mobile <span className="font-normal text-slate-400">(optional)</span>
+          <label htmlFor="applicant-mobile" className="text-sm font-semibold text-ink">
+            Mobile <span className="font-normal text-muted">(optional)</span>
           </label>
           <input
             id="applicant-mobile"
@@ -635,12 +636,12 @@ export function ApplicantDetailsStep({
             value={details.mobile ?? ""}
             onChange={(e) => set("mobile", e.target.value)}
             maxLength={30}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+            className="paper-field min-h-11 px-3 text-sm"
           />
         </div>
       </div>
 
-      {error && <p className="text-[13px] text-red-600">{error}</p>}
+      {error && <p className="text-[13.5px] font-medium text-stamp">{error}</p>}
     </div>
   );
 }
