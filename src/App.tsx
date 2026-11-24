@@ -119,7 +119,8 @@ function App() {
         />
       </div>
 
-      <SiteFooter />
+      {/* The home page ends with its own footer, which says the same and credits its photos. */}
+      {view !== "home" && <SiteFooter />}
     </div>
   );
 }

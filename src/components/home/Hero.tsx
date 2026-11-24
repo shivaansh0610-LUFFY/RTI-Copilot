@@ -124,17 +124,17 @@ export default function Hero({
             short. You file it yourself.
           </p>
           <div className="hero-actions">
-            <button type="button" onClick={onStart} className="hero-btn hero-btn-primary">
+            <button type="button" onClick={() => onStart()} className="hero-btn hero-btn-primary">
               Start my RTI
               <ArrowRight size={18} aria-hidden="true" />
             </button>
             {onReview && (
-              <button type="button" onClick={onReview} className="hero-btn hero-btn-ghost">
+              <button type="button" onClick={() => onReview()} className="hero-btn hero-btn-ghost">
                 <ShieldCheck size={18} aria-hidden="true" />
                 Check my draft
               </button>
             )}
-            <button type="button" onClick={onAnalyse} className="hero-btn hero-btn-ghost">
+            <button type="button" onClick={() => onAnalyse()} className="hero-btn hero-btn-ghost">
               <Scale size={18} aria-hidden="true" />I got a reply
             </button>
           </div>
