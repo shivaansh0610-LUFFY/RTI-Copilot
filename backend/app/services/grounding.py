@@ -11,7 +11,9 @@ app.services.retrieval) and returns the best few with the source each came from.
 """
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -58,14 +60,35 @@ def _relevant(session: Session, grievance: str) -> list[CorpusPassage]:
         for query, vector in zip(queries, vectors, strict=True)
     ]
     best = retrieval.reciprocal_rank_fusion(rankings)[:MAX_PASSAGES]
+    return _load(session, best)
+
+
+def passages_for(
+    query: str, k: int, doc_types: Sequence[str] | None = None, *, session: Session | None = None
+) -> list[CorpusPassage]:
+    """At most `k` corpus passages matching `query`, best first, restricted to `doc_types` when
+    given (see app.models.Source.doc_type) -- e.g. ["act", "rules"] to check a claim against the
+    RTI Act and Rules rather than the whole corpus. Opens its own session unless one is given."""
+    if session is not None:
+        return _passages_for(session, query, k, doc_types)
+    with Session(get_engine(), expire_on_commit=False) as own_session:
+        return _passages_for(own_session, query, k, doc_types)
+
+
+def _passages_for(session: Session, query: str, k: int, doc_types: Sequence[str] | None) -> list[CorpusPassage]:
+    hits = retrieval.search_passages(query, k, session=session, doc_types=doc_types)
+    return _load(session, [passage.id for passage in hits])
+
+
+def _load(session: Session, passage_ids: list[UUID]) -> list[CorpusPassage]:
     rows = session.execute(
         select(Passage.id, Passage.text, Passage.page, Source.title, Source.url)
         .join(Document, Passage.document_id == Document.id)
         .join(Source, Document.source_id == Source.id)
-        .where(Passage.id.in_(best))
+        .where(Passage.id.in_(passage_ids))
     ).all()
     by_id = {row.id: row for row in rows}
-    found = [by_id[passage_id] for passage_id in best if passage_id in by_id]
+    found = [by_id[passage_id] for passage_id in passage_ids if passage_id in by_id]
     return [
         CorpusPassage(id=f"S-{number}", text=clean(row.text), page=row.page, source_title=row.title, url=row.url)
         for number, row in enumerate(found, start=1)

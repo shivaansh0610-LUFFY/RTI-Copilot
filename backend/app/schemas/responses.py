@@ -25,12 +25,26 @@ class ResponsePassage(ApiModel):
     text: str
 
 
+class CorpusCitation(ApiModel):
+    """A passage of the official corpus (the RTI Act, Rules, or CPWD Works Manual) that checks a
+    finding against the actual rule, e.g. whether a claimed exemption or fee is a real one."""
+
+    id: str
+    text: str
+    page: int
+    source_title: str
+    url: str
+
+
 class ClassificationResult(ApiModel):
     request_id: str
     label: ClassificationLabel
     explanation: str
     evidence: list[ResponsePassage] = []
     abstention_reason: str | None = None  # set when label is INSUFFICIENT_EVIDENCE
+    # Corpus passages that check the finding against the actual rule -- only set for labels where
+    # the PIO is making a claim worth checking (see response_analysis.GROUNDING_QUERIES).
+    grounding: list[CorpusCitation] = []
 
 
 class ResponseAnalysis(ApiModel):

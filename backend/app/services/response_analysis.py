@@ -7,17 +7,34 @@ The model's answer is checked rather than trusted, because the citizen acts on i
 files an appeal): a label that needs evidence but cites no real passage, a request the model
 skipped, or an unknown label all become INSUFFICIENT_EVIDENCE, and so does every request when
 the model cannot be reached. Nothing is made up to fill a gap.
+
+For a few labels the PIO is making a claim worth checking against the rules, not just the
+model's say-so: a claimed exemption, a "no record" answer, or a demanded fee. For those,
+_ground() runs a hybrid (vector + keyword) search over the corpus, restricted to the relevant
+source types, and attaches the passages as grounding -- the same retrieval app.services.grounding
+uses for drafting citations, now reused on the analysis side.
 """
 
 import io
 import logging
 
 from app.schemas import InformationRequest
-from app.schemas.responses import ClassificationResult, ResponsePassage
-from app.services import llm
+from app.schemas.responses import ClassificationResult, CorpusCitation, ResponsePassage
+from app.services import grounding, llm
 from ingest.extract import ExtractionError, pdf_pages, split_clauses
 
 logger = logging.getLogger(__name__)
+
+# For these labels the PIO is making a claim that the actual rules can check: a claimed
+# exemption may not be one the Act actually allows, a "no record" claim may concern a record the
+# manual requires the department to keep, and a demanded fee may not match what the Rules set.
+# Each maps to a query against the corpus and the source types worth searching for it.
+GROUNDING_QUERIES: dict[str, tuple[str, list[str]]] = {
+    "EXEMPTION_CLAIMED": ("exemption from disclosure of information under Section 8 or Section 9", ["act", "rules"]),
+    "NO_RECORD_STATED": ("records required to be maintained for this kind of work", ["manual"]),
+    "FEE_DEMANDED": ("fee payable for providing information under the RTI Act and Rules", ["act", "rules"]),
+}
+GROUNDING_PER_LABEL = 2
 
 MAX_BYTES = 10 * 1024 * 1024
 MAX_PAGES = 40
@@ -143,8 +160,32 @@ def _checked(request_id: str, item: dict | None, by_passage: dict[str, ResponseP
         reason = str(item.get("abstention_reason") or "").strip() or "The reply is unclear about this request."
         return abstain(request_id, reason, explanation, evidence)
     return ClassificationResult(
-        request_id=request_id, label=label, explanation=explanation or label, evidence=evidence
+        request_id=request_id,
+        label=label,
+        explanation=explanation or label,
+        evidence=evidence,
+        grounding=_ground(label),
     )
+
+
+def _ground(label: str) -> list[CorpusCitation]:
+    """Corpus passages that check this finding against the actual rule, or [] when the label
+    isn't one worth checking, the corpus has nothing relevant, or the database isn't reachable --
+    grounding is a supplementary check, so it never turns a finding itself into a failure."""
+    spec = GROUNDING_QUERIES.get(label)
+    if spec is None:
+        return []
+    query, doc_types = spec
+    try:
+        passages = grounding.passages_for(query, GROUNDING_PER_LABEL, doc_types)
+    except Exception:
+        logger.warning("Corpus grounding failed for label %s; showing the finding without it", label, exc_info=True)
+        return []
+    return [
+        CorpusCitation(id=passage.id, text=grounding.quote(passage.text), page=passage.page,
+                       source_title=passage.source_title, url=passage.url)
+        for passage in passages
+    ]
 
 
 def abstain(

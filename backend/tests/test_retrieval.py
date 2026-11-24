@@ -135,11 +135,11 @@ def stored(session, tmp_path):
 def stub_searches(monkeypatch, vector, keyword):
     calls = {"vector": 0, "keyword": 0}
 
-    def vector_ranking(session, embedding, limit):
+    def vector_ranking(session, embedding, limit, doc_types=None):
         calls["vector"] += 1
         return vector
 
-    def keyword_ranking(session, tsquery, limit):
+    def keyword_ranking(session, tsquery, limit, doc_types=None):
         calls["keyword"] += 1
         return keyword
 
@@ -210,8 +210,8 @@ def test_a_query_without_words_uses_only_the_vector_search(session, stored, monk
 
 def test_each_search_is_asked_for_at_least_k_candidates(session, stored, monkeypatch):
     limits = []
-    monkeypatch.setattr(retrieval, "_vector_ranking", lambda s, e, limit: limits.append(limit) or [])
-    monkeypatch.setattr(retrieval, "_keyword_ranking", lambda s, t, limit: limits.append(limit) or [])
+    monkeypatch.setattr(retrieval, "_vector_ranking", lambda s, e, limit, doc_types=None: limits.append(limit) or [])
+    monkeypatch.setattr(retrieval, "_keyword_ranking", lambda s, t, limit, doc_types=None: limits.append(limit) or [])
 
     search_passages("road", k=3, session=session)
     search_passages("road", k=200, session=session)
@@ -325,6 +325,27 @@ def test_without_a_session_it_uses_the_application_engine(pg, monkeypatch):
     results = search_passages("appeal to the first appellate authority", k=1)
 
     assert results[0].text == CORPUS["appeal"]  # readable although the session that loaded it is closed
+
+
+def test_doc_types_restricts_the_search_to_matching_sources(pg, tmp_path):
+    manual_source = add_source(pg, tmp_path, "manual.pdf", make_pdf([["x"]]), doc_type="manual")
+    manual_document = Document(source_id=manual_source.id, kind="corpus", filename="manual.pdf", page_count=1)
+    pg.add(manual_document)
+    pg.flush()
+    text = "Gully pits and road-side drains are desilted under this manual's maintenance schedule."
+    pg.add(Passage(document_id=manual_document.id, page=1, paragraph=1, text=text, embedding=fake_embed(text)))
+    pg.commit()
+
+    # Without a filter, the manual-only passage is reachable.
+    assert any(result.text == text for result in search_passages("gully pits desilted", k=5, session=pg))
+
+    # Restricted to "act" (the fixture's own source), the manual-only passage cannot be returned.
+    results = search_passages("gully pits desilted", k=5, session=pg, doc_types=["act"])
+    assert all(result.text != text for result in results)
+
+    # Restricted to "manual", only that passage comes back.
+    results = search_passages("gully pits desilted", k=5, session=pg, doc_types=["manual"])
+    assert [result.text for result in results] == [text]
 
 
 def test_an_ingested_pdf_is_searchable(pg, tmp_path):
