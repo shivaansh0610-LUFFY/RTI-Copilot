@@ -54,6 +54,9 @@ def deterministic_settings(monkeypatch):
     monkeypatch.setattr(settings, "use_llm_drafting", False)
     monkeypatch.setattr(settings, "use_public_info_lookup", False)
     monkeypatch.setattr(settings, "use_corpus_citations", False)
+    # A developer's own Cloudflare keys must not send the tests' embeddings to Cloudflare.
+    monkeypatch.setattr(settings, "cloudflare_account_id", "")
+    monkeypatch.setattr(settings, "cloudflare_api_token", "")
 
 
 @pytest.fixture

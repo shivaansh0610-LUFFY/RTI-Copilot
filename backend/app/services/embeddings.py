@@ -3,10 +3,18 @@
 The first call downloads the model weights (about 1.3 GB) and loads them, which takes far longer
 than encoding; later calls reuse the loaded model. Vectors are L2-normalised, so cosine
 similarity is a plain dot product and matches the `<=>` cosine distance used in retrieval.
+
+A server with little memory (free hosts give 512 MB) can call use_cloudflare() instead: the same
+model then runs on Cloudflare Workers AI, with CLS pooling and normalised here like the local one,
+so its vectors match the passages already stored. Ingestion never calls it, so the corpus is
+always embedded locally.
 """
 
 import logging
+import math
 import threading
+
+import httpx
 
 MODEL_NAME = "BAAI/bge-large-en-v1.5"
 EMBEDDING_DIMENSIONS = 1024
@@ -25,6 +33,18 @@ _model_lock = threading.Lock()
 # the server's worker threads crashed the whole process with a segmentation fault, and a few
 # short queries per request are fast enough on the CPU.
 _device: str | None = None
+
+# (account id, API token) once use_cloudflare() has been called; None embeds locally.
+_cloudflare: tuple[str, str] | None = None
+CLOUDFLARE_URL = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/@cf/baai/bge-large-en-v1.5"
+# The most texts the model takes in one request.
+CLOUDFLARE_BATCH = 100
+
+
+def use_cloudflare(account_id: str, api_token: str) -> None:
+    """Embed on Cloudflare Workers AI from now on, instead of loading the model in this process."""
+    global _cloudflare
+    _cloudflare = (account_id, api_token)
 
 
 def use_cpu() -> None:
@@ -58,6 +78,8 @@ def embed_texts(texts: list[str], batch_size: int = BATCH_SIZE) -> list[list[flo
     """One normalised vector per text, encoded `batch_size` texts at a time."""
     if not texts:
         return []
+    if _cloudflare is not None:
+        return _embed_on_cloudflare(texts)
     vectors = _load_model().encode(
         texts,
         batch_size=batch_size,
@@ -65,6 +87,31 @@ def embed_texts(texts: list[str], batch_size: int = BATCH_SIZE) -> list[list[flo
         show_progress_bar=len(texts) > batch_size,
     )
     return [vector.tolist() for vector in vectors]
+
+
+def _embed_on_cloudflare(texts: list[str]) -> list[list[float]]:
+    account, token = _cloudflare
+    vectors: list[list[float]] = []
+    for start in range(0, len(texts), CLOUDFLARE_BATCH):
+        response = httpx.post(
+            CLOUDFLARE_URL.format(account=account),
+            headers={"Authorization": f"Bearer {token}"},
+            # CLS pooling, as sentence-transformers uses for BGE (Cloudflare defaults to mean).
+            json={"text": texts[start : start + CLOUDFLARE_BATCH], "pooling": "cls"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        rows = response.json()["result"]["data"]
+        expected = len(texts[start : start + CLOUDFLARE_BATCH])
+        if len(rows) != expected or any(len(row) != EMBEDDING_DIMENSIONS for row in rows):
+            raise ValueError("Cloudflare returned an unexpected number or size of vectors")
+        vectors.extend(_normalised(row) for row in rows)
+    return vectors
+
+
+def _normalised(vector: list[float]) -> list[float]:
+    length = math.sqrt(sum(value * value for value in vector)) or 1.0
+    return [float(value) / length for value in vector]
 
 
 def embed_query(query: str) -> list[float]:
