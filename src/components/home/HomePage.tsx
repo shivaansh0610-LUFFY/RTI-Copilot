@@ -10,7 +10,7 @@ import RightToInformation from "./RightToInformation";
 import "./story.css";
 
 // The home page, told as a story in chapters: the slideshow hero, what RTI is, the problem,
-// the records worth asking for, how it works (with the demo), the problems to start from,
+// the records worth asking for, how it works (with the demo), the problems it can help with,
 // and a call to ask.
 export default function HomePage({
   onStart,
@@ -28,16 +28,13 @@ export default function HomePage({
   return (
     <div ref={root} className="story">
       <div aria-hidden="true" className="story-progress" />
-      <div className="story-disclaimer">
-        <p className="story-wrap">An independent citizen tool. Not a government website, and not run by PWD Delhi.</p>
-      </div>
       <main>
         <Hero onStart={startBlank} onAnalyse={onAnalyse} onReview={onReview} />
         <RightToInformation />
         <ProblemCollage />
         <RecordStrips onStart={onStart} />
         <HowItWorks />
-        <ProblemString onStart={onStart} />
+        <ProblemString />
         <Closing onStart={startBlank} onAnalyse={onAnalyse} onReview={onReview} />
       </main>
       <StoryFooter />

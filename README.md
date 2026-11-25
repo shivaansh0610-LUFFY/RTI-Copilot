@@ -80,10 +80,18 @@ The whole RTI loop runs end to end, for road grievances against PWD Delhi:
 
 Around it: a home page that tells the story in chapters (a slideshow of road problems and
 the record that answers each, the five records Section 2(j) lets you ask for, a 30-second demo
-that plays on the application sheet, and the problems PWD handles to start from), **My RTIs**
+that plays on the application sheet, and polaroids of the problems PWD handles; the first step
+of the draft offers those problems as opening words), **My RTIs**
 (every draft kept in the browser, with the reply due date and the appeal window once the
 filing date is entered), and print / save as PDF for the draft and the appeal. Inputs are
 size-limited on the API.
+
+The pages after the home page share its look (paper, ink blue, Khand titles; the colours and
+fonts are Tailwind theme values in `src/index.css`), each with one touch from paper
+(`src/components/layout/paper.css`): the application on a taped sheet with the PIO review's
+score stamped on it, the officer check's excuses in red pen in the margin, the PIO review's
+score as a rubber stamp, the PIO's reply marked with highlighters (green answered, amber partly,
+red refused), and My RTIs as a ruled register with the deadlines as date stamps.
 
 The home page's photos come from Wikimedia Commons under CC BY, CC BY-SA, CC0 and GODL-India;
 each is credited in the page footer, from `src/components/home/photos.ts`, which a test keeps

@@ -18,9 +18,9 @@ for the right ones and are not fobbed off.
 
 0. **Home page.** Scroll the story: the slideshow (each slide pairs a problem with the record
    to ask for), Right to Information, the five records (open a strip or two), then **How it
-   works**: press play on the application sheet for the 30-second demo. Under the polaroids,
-   the problems are only things PWD is responsible for on its roads. Click **Pothole or
-   broken road**.
+   works**: press play on the application sheet for the 30-second demo. The polaroids show
+   only problems PWD is responsible for on its roads. Click **Start my RTI**, then **Pothole
+   or broken road** in "Pick one to start", beside the description box.
 1. **Describe.** Replace the starter sentence with:
    > There is a big pothole on Ring Road near Lajpat Nagar metro station. It has been there
    > for about 6 months, two-wheelers fall almost every week, and nobody from PWD has repaired
@@ -35,23 +35,25 @@ for the right ones and are not fobbed off.
    link that opens the PDF at that page. *This is the GenAI core: retrieval over 4,789
    passages of official documents, cited, never invented.*
 4. **Officer check.** Each request is read the way a reluctant PIO would read it. A vague one
-   gets the excuse the officer could use and the section behind it; reword it and **Check
-   again**.
+   gets the excuse the officer could use, in red pen in the margin, with the section behind
+   it; reword it and **Check again**.
 5. **Your details.** Name, father's or husband's name and address, for the printed letter.
 6. **Draft.** One application: Section 6(1), the location, numbered requests, a Section 6(3)
    transfer clause, with your details in the letter. Switch to **हिंदी**. Copy, or **PDF**
    (print or save as PDF, with any photos as extra pages). **Check like a PIO** scores it out of
-   10 and can suggest a safer version. Note the dates: the reply is due in 30 days, then the
-   appeal window.
+   10 (the score lands as a rubber stamp, on the review and on the letter) and can suggest a
+   safer version. Note the dates: the reply is due in 30 days, then the appeal window.
 7. **Got the reply? Analyse it.** Upload `demo/sample-pio-reply.pdf` (a made-up reply,
    labelled as a sample). Each request gets a finding with the line of the reply it is based
    on: answered via an annexure, "not maintained", a fee demanded, an exemption claimed under
-   Section 8, transferred. Where the AI cannot tell, it says "Insufficient evidence" rather
-   than guessing.
+   Section 8, transferred. On **Findings** those lines are marked on the reply with a
+   highlighter: green answered, amber partly, red refused. Where the AI cannot tell, it says
+   "Insufficient evidence" rather than guessing.
 8. **Draft first appeal.** Select the unanswered requests and draft the Section 19(1)
    appeal. Registration number and dates stay as [placeholders]: the app never guesses them.
 9. **My RTIs.** The application is listed there. Enter today as the filing date: it shows
-   "Reply due by ... (30 days left)", and after that the appeal window. It is kept in this
+   "Reply due by ... (30 days left)" under a REPLY DUE date stamp, and after that the appeal
+   window. It is kept in this
    browser only; nothing is sent anywhere.
 
 ## If something goes wrong

@@ -109,3 +109,20 @@ test("without a drafted case it says it is showing sample data", () => {
   expect(screen.getByText(/Sample data/)).toBeTruthy();
   expect(screen.queryByText(/simulate/i)).toBeNull();
 });
+
+test("the findings mark the line of the reply each one rests on, numbered by its request", async () => {
+  vi.mocked(analyseResponse).mockResolvedValue(ANALYSIS);
+  render(<ResponseAnalysisWizard filedCase={FILED} onFileFollowUp={() => {}} />);
+  upload();
+  await screen.findByText(/Response processed/);
+  next();
+  next(); // findings
+
+  const mark = screen.getByText(/Deposit Rs. 46/);
+  expect(mark.tagName).toBe("MARK");
+  // A fee asked for is a next step, not a refusal: grey, not red.
+  expect(mark.className).toContain("hl-info");
+  expect(mark.parentElement?.textContent).toMatch(/^2/);
+  // The finding with no line behind it is still listed.
+  expect(screen.getByText("The reply does not mention the work order.")).toBeTruthy();
+});

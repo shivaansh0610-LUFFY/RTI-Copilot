@@ -1,4 +1,4 @@
-import { ArrowRight, Pause, Play, Scale, ShieldCheck } from "lucide-react";
+import { ArrowRight, Scale, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { prefersReducedMotion } from "./motion";
 import { SLIDES } from "./photos";
@@ -27,9 +27,11 @@ export default function Hero({
   const [index, setIndex] = useState(0);
   // The slide fading out stays visible underneath the new one until the fade ends.
   const [previous, setPrevious] = useState(-1);
-  // People who ask their system for less motion get a still photo; the controls still work.
+  // People who ask their system for less motion get a still photo. There are no slideshow
+  // controls, so the slide also holds while keyboard focus is on the hero's buttons.
   const [reduced] = useState(prefersReducedMotion);
-  const [paused, setPaused] = useState(reduced);
+  const [focused, setFocused] = useState(false);
+  const paused = reduced || focused;
   const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function Hero({
     return () => window.clearTimeout(id);
   }, []);
 
-  // A timeout per slide, so picking a slide by hand also restarts its full time on screen.
+  // A timeout per slide, so a slide held by focus gets its full time again afterwards.
   useEffect(() => {
     if (paused) return;
     const id = window.setTimeout(() => {
@@ -47,17 +49,18 @@ export default function Hero({
     return () => window.clearTimeout(id);
   }, [index, paused]);
 
-  function goTo(n: number) {
-    if (n === index) return;
-    setPrevious(index);
-    setIndex(n);
-  }
-
   const slide = SLIDES[index];
   const zoom = zoomed && !reduced ? 1.08 : 1;
 
   return (
-    <section aria-labelledby="hero-title" className="story-wrap hero">
+    <section
+      aria-labelledby="hero-title"
+      className="story-wrap hero"
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
+    >
       <div className="hero-panel">
         {SLIDES.map((s, k) => {
           const shown = k === index || k === previous;
@@ -81,34 +84,11 @@ export default function Hero({
         <div className="hero-shade" style={{ background: SHADE }} />
 
         <div className="hero-top">
-          {/* Read out only when the slideshow is paused, so it never talks over the page. */}
-          <div className="hero-note" aria-live={paused ? "polite" : "off"}>
+          <div className="hero-note">
             <p className="hero-note-question">{slide.question}</p>
             <p className="hero-note-ask">
               <span>Ask for:</span> {slide.ask}
             </p>
-          </div>
-          <div role="group" aria-label="Slideshow controls" className="hero-controls">
-            {SLIDES.map((s, k) => (
-              <button
-                key={s.photo.src}
-                type="button"
-                aria-label={`Show slide ${k + 1} of ${SLIDES.length}: ${s.question}`}
-                aria-current={k === index ? "true" : "false"}
-                onClick={() => goTo(k)}
-                className="hero-dot"
-              >
-                <span />
-              </button>
-            ))}
-            <button
-              type="button"
-              aria-label={paused ? "Play the slideshow" : "Pause the slideshow"}
-              onClick={() => setPaused((p) => !p)}
-              className="hero-pause"
-            >
-              {paused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />}
-            </button>
           </div>
         </div>
 
@@ -138,6 +118,9 @@ export default function Hero({
               <Scale size={18} aria-hidden="true" />I got a reply
             </button>
           </div>
+          <p className="hero-independent">
+            An independent citizen tool. Not a government website, and not run by PWD Delhi.
+          </p>
         </div>
       </div>
 

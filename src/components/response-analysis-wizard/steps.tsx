@@ -9,8 +9,52 @@ import type {
   InformationRequest,
   ResponsePassage,
 } from "../../types";
-import { FOLLOW_UP_LABELS, LABEL_BADGE_CLASSES, LABEL_TEXT, NEXT_STEP_HINT } from "./constants";
+import { Sheet } from "../layout/Paper";
+import { FOLLOW_UP_LABELS, LABEL_TEXT, LABEL_TONE, NEXT_STEP_HINT, type LabelTone } from "./constants";
 import { PrimaryButton, SecondaryButton } from "./ui";
+
+const BADGE: Record<LabelTone, string> = {
+  good: "bg-[#e6f6ec] text-leaf",
+  part: "bg-[#fff1d6] text-[#8a4b08]",
+  bad: "bg-[#fdecea] text-stamp",
+  info: "bg-paper-warm text-ink-3",
+};
+
+// The numbered circle that ties a finding to its mark on the reply.
+const TAG: Record<LabelTone, string> = {
+  good: "bg-[#1e8a4c]",
+  part: "bg-[#9a6114]",
+  bad: "bg-stamp",
+  info: "bg-muted",
+};
+
+const BAR: Record<LabelTone, string> = {
+  good: "bg-[#1e8a4c]",
+  part: "bg-[#d39a2c]",
+  bad: "bg-stamp",
+  info: "bg-faint",
+};
+
+function Tag({ n, tone }: { n: number; tone: LabelTone }) {
+  return (
+    <span
+      className={
+        "inline-grid h-[21px] w-[21px] shrink-0 place-items-center rounded-full align-[2px] font-mono text-[11.5px] font-semibold text-white " +
+        TAG[tone]
+      }
+    >
+      {n}
+    </span>
+  );
+}
+
+function PassageRef({ passage }: { passage: ResponsePassage }) {
+  return (
+    <span className="font-mono text-[11.5px] text-muted">
+      p.{passage.page} &para;{passage.paragraph}
+    </span>
+  );
+}
 
 export function UploadStep({
   file,
@@ -32,13 +76,13 @@ export function UploadStep({
     <div className="flex flex-col gap-4">
       <label
         htmlFor="response-file"
-        className="flex cursor-pointer flex-col items-center gap-2 rounded-md border border-dashed border-slate-300 p-8 text-center"
+        className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-edge-strong bg-card px-6 py-12 text-center transition-colors hover:border-ink-3"
       >
-        <FileUp size={24} className="text-slate-400" />
-        <span className="text-sm font-medium text-slate-900">
+        <FileUp size={28} className="text-brown" />
+        <span className="font-serif text-[17px] font-semibold text-ink">
           {file ? file.name : "Click to select a file, or drop it here"}
         </span>
-        <span className="text-xs text-slate-500">Accepts .pdf or .txt</span>
+        <span className="text-[13px] text-muted">The PIO&apos;s reply, as a .pdf or .txt</span>
         <input
           id="response-file"
           type="file"
@@ -49,39 +93,42 @@ export function UploadStep({
       </label>
 
       {processingFailed && (
-        <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-red-50 p-4">
-          <AlertTriangle size={16} className="mt-0.5 text-red-600" />
+        <div className="flex items-start gap-2.5 rounded-lg border border-[#f2b8b0] bg-[#fff7f5] p-4">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-stamp" />
           <div>
-            <p className="text-sm font-medium text-red-700">Processing failed</p>
-            <p className="text-[13px] text-red-600">{processingError}</p>
+            <p className="text-sm font-semibold text-stamp">Processing failed</p>
+            <p className="text-[14px] text-ink-2">{processingError}</p>
           </div>
         </div>
       )}
 
       {ingestResult && !processingFailed && (
-        <div className="rounded-md border border-slate-200 p-4">
-          <p className="text-sm font-medium text-slate-900">Response processed</p>
-          <p className="mt-1 text-xs text-slate-500">
-            {ingestResult.pages} page{ingestResult.pages === 1 ? "" : "s"} &middot;{" "}
-            {ingestResult.passages.length} passages extracted &middot; OCR used:{" "}
-            {ingestResult.ocrUsed ? "Yes" : "No"}
-          </p>
+        <div className="flex items-start gap-2.5 rounded-lg border border-[#9fd5ae] bg-leaf-wash p-4">
+          <Check size={18} strokeWidth={3} className="mt-0.5 shrink-0 text-leaf" />
+          <div>
+            <p className="text-sm font-semibold text-leaf">Response processed</p>
+            <p className="mt-0.5 text-[13px] text-ink-3">
+              {ingestResult.pages} page{ingestResult.pages === 1 ? "" : "s"} &middot;{" "}
+              {ingestResult.passages.length} passages extracted &middot; OCR used:{" "}
+              {ingestResult.ocrUsed ? "Yes" : "No"}
+            </p>
+          </div>
         </div>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-slate-500">
+        <p className="text-[13px] text-muted">
           The reply is read on the server to analyse it, and is not stored.
         </p>
 
         {processingFailed ? (
           <SecondaryButton onClick={onProcess} disabled={isProcessing}>
-            {isProcessing && <Loader2 size={14} className="animate-spin" />}
+            {isProcessing && <Loader2 size={16} className="animate-spin" />}
             Retry
           </SecondaryButton>
         ) : (
           <PrimaryButton onClick={onProcess} disabled={!file || isProcessing || Boolean(ingestResult)}>
-            {isProcessing && <Loader2 size={14} className="animate-spin" />}
+            {isProcessing && <Loader2 size={16} className="animate-spin" />}
             Process response
           </PrimaryButton>
         )}
@@ -90,6 +137,18 @@ export function UploadStep({
   );
 }
 
+function Quote({ passage }: { passage: ResponsePassage }) {
+  return (
+    <blockquote className="border-l-2 border-khaki pl-3 font-serif text-[14.5px] leading-relaxed text-ink-2">
+      &ldquo;{passage.text}&rdquo;
+      <span className="mt-0.5 block">
+        <PassageRef passage={passage} />
+      </span>
+    </blockquote>
+  );
+}
+
+// Each request beside the lines of the reply it was matched to, as rows of a ruled sheet.
 export function AlignStep({
   requests,
   alignment,
@@ -101,112 +160,161 @@ export function AlignStep({
 }) {
   const [showExtractedText, setShowExtractedText] = useState(false);
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-5">
       {passages.length > 0 && (
-        <div className="rounded-md border border-slate-200 p-4">
+        <div className="max-w-3xl">
           <button
             type="button"
             onClick={() => setShowExtractedText((shown) => !shown)}
-            className="text-sm font-medium text-slate-900 underline"
+            className="py-1 text-[15px] font-semibold text-ink-blue underline underline-offset-4"
           >
             {showExtractedText ? "Hide" : "View"} the text read from your file ({passages.length} passages)
           </button>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-[13px] text-muted">
             Check this against the original if a match below looks wrong -- a scan OCR misread would
             show up here first.
           </p>
           {showExtractedText && (
-            <div className="mt-3 flex max-h-96 flex-col gap-2 overflow-y-auto">
+            <div className="mt-3 flex max-h-96 flex-col gap-3 overflow-y-auto rounded-lg border border-edge bg-white p-4">
               {passages.map((passage) => (
-                <blockquote key={passage.id} className="border-l-2 border-slate-200 pl-2 text-sm text-slate-700">
-                  "{passage.text}"
-                  <span className="mt-0.5 block text-xs text-slate-400">
-                    p.{passage.page} &para;{passage.paragraph}
-                  </span>
-                </blockquote>
+                <Quote key={passage.id} passage={passage} />
               ))}
             </div>
           )}
         </div>
       )}
-      {requests.map((request) => {
-        const passages = alignment[request.id] ?? [];
-        return (
-          <div key={request.id} className="grid grid-cols-2 gap-4 rounded-md border border-slate-200 p-4">
-            <div>
-              <p className="text-sm font-medium text-slate-900">{request.title}</p>
-              <p className="mt-1 text-xs text-slate-500">{request.id}</p>
-            </div>
-            <div>
-              {passages.length === 0 ? (
-                <p className="text-sm text-gray-500">No matching passage found</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {passages.map((passage) => (
-                    <blockquote key={passage.id} className="border-l-2 border-slate-200 pl-2 text-sm text-slate-700">
-                      "{passage.text}"
-                      <span className="mt-0.5 block text-xs text-slate-400">
-                        p.{passage.page} &para;{passage.paragraph}
-                      </span>
-                    </blockquote>
-                  ))}
+
+      <ol aria-label="Your requests and the lines of the reply matched to them" className="paper-sheet">
+        <li aria-hidden="true" className="hidden border-b-2 border-ink lg:grid lg:grid-cols-2">
+          <span className="paper-label px-7 py-3 text-brown">Your request</span>
+          <span className="paper-label border-l-2 border-l-stamp/35 px-7 py-3 text-brown">What the reply says</span>
+        </li>
+        {requests.map((request, index) => {
+          const matched = alignment[request.id] ?? [];
+          return (
+            <li key={request.id} className="grid border-b border-rule last:border-b-0 lg:grid-cols-2">
+              <div className="flex gap-3 px-5 py-5 sm:px-7">
+                <span className="pt-0.5 font-mono text-[15px] font-semibold text-ink-blue">{index + 1}.</span>
+                <div className="min-w-0">
+                  <p className="font-serif text-[16px] leading-relaxed text-ink">{request.title}</p>
+                  <p className="mt-1 font-mono text-[11.5px] text-muted">{request.id}</p>
                 </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+              </div>
+              <div className="border-t border-dashed border-edge bg-paper-light px-5 py-5 sm:px-7 lg:border-l-2 lg:border-t-0 lg:border-solid lg:border-l-stamp/35">
+                {matched.length === 0 ? (
+                  <p className="font-hand text-[17px] text-stamp">No matching passage found</p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {matched.map((passage) => (
+                      <Quote key={passage.id} passage={passage} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
 
-export function ClassificationCard({
-  request,
-  result,
-}: {
-  request: InformationRequest;
-  result: ClassificationResult;
-}) {
-  return (
-    <div className="rounded-md border border-slate-200 p-4">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-slate-900">{request.title}</p>
-        <LabelBadge label={result.label} />
-      </div>
-      <p className="text-sm text-slate-600">{result.explanation}</p>
-      {result.label === "INSUFFICIENT_EVIDENCE" && result.abstentionReason && (
-        <p className="mt-1 text-xs text-gray-500">Reason: {result.abstentionReason}</p>
-      )}
-      {result.evidence.length > 0 && (
-        <div className="mt-2 flex flex-col gap-2">
-          {result.evidence.map((passage) => (
-            <blockquote key={passage.id} className="border-l-2 border-slate-200 pl-2 text-sm text-slate-700">
-              "{passage.text}"
-              <span className="mt-0.5 block text-xs text-slate-400">
-                p.{passage.page} &para;{passage.paragraph}
-              </span>
-            </blockquote>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
+// The PIO's reply on a sheet, every line a finding rests on marked with a highlighter in the
+// finding's colour and numbered with its request; the findings themselves beside it.
 export function ClassifyStep({
   requests,
   results,
+  passages,
 }: {
   requests: InformationRequest[];
   results: Record<string, ClassificationResult>;
+  passages: ResponsePassage[];
 }) {
+  const findings = requests
+    .map((request, index) => ({ request, n: index + 1, result: results[request.id] }))
+    .filter((finding): finding is { request: InformationRequest; n: number; result: ClassificationResult } =>
+      Boolean(finding.result),
+    );
+  // Which findings cite each passage of the reply, in request order.
+  const citedBy = new Map<string, { n: number; tone: LabelTone }[]>();
+  for (const { n, result } of findings) {
+    for (const passage of result.evidence) {
+      citedBy.set(passage.id, [...(citedBy.get(passage.id) ?? []), { n, tone: LABEL_TONE[result.label] }]);
+    }
+  }
+  const onSheet = new Set(passages.map((passage) => passage.id));
+
   return (
-    <div className="flex flex-col gap-3">
-      {requests.map((request) => {
-        const result = results[request.id];
-        if (!result) return null;
-        return <ClassificationCard key={request.id} request={request} result={result} />;
-      })}
+    <div className="flex flex-col gap-5">
+      <p aria-hidden="true" className="flex flex-wrap gap-x-5 gap-y-2 text-[13.5px] text-ink-3">
+        <span><span className="hl hl-good">Answered</span></span>
+        <span><span className="hl hl-part">Partly answered</span></span>
+        <span><span className="hl hl-bad">Refused or dodged</span></span>
+        <span><span className="hl hl-info">Another next step</span></span>
+      </p>
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-x-11">
+        <Sheet label="The PIO's reply" className="px-5 pb-10 pt-14 sm:px-12 sm:pb-12 lg:sticky lg:top-24">
+          {passages.length === 0 ? (
+            <p className="text-sm text-muted">No text was read from the reply.</p>
+          ) : (
+            <div className="flex flex-col gap-4 font-serif text-[15px] leading-[1.9] text-ink-3">
+              {passages.map((passage) => {
+                const cites = citedBy.get(passage.id);
+                if (!cites) return <p key={passage.id}>{passage.text}</p>;
+                return (
+                  <p key={passage.id} className="text-ink">
+                    {cites.map((cite) => (
+                      <span key={cite.n} className="mr-1.5">
+                        <Tag n={cite.n} tone={cite.tone} />
+                      </span>
+                    ))}
+                    <mark className={"hl text-ink hl-" + cites[0].tone}>{passage.text}</mark>
+                  </p>
+                );
+              })}
+            </div>
+          )}
+        </Sheet>
+
+        <section aria-labelledby="findings-heading" className="overflow-hidden rounded-lg border border-edge bg-card">
+          <h3
+            id="findings-heading"
+            className="border-b border-edge px-5 py-4 font-title text-2xl font-bold uppercase leading-none text-ink"
+          >
+            Findings
+          </h3>
+          <ul>
+            {findings.map(({ request, n, result }) => (
+              <li key={request.id} className="border-b border-rule px-5 py-4 last:border-b-0">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="flex min-w-0 flex-1 items-start gap-2 text-[14.5px] font-semibold leading-snug text-ink">
+                    <Tag n={n} tone={LABEL_TONE[result.label]} />
+                    <span>{request.title}</span>
+                  </p>
+                  <LabelBadge label={result.label} />
+                </div>
+                <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{result.explanation}</p>
+                {result.label === "INSUFFICIENT_EVIDENCE" && result.abstentionReason && (
+                  <p className="mt-1 text-[13px] text-muted">Reason: {result.abstentionReason}</p>
+                )}
+                {result.evidence.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-2">
+                    {result.evidence.map((passage) =>
+                      onSheet.has(passage.id) ? (
+                        <p key={passage.id} className="text-[12.5px] text-muted">
+                          Marked on the reply: <PassageRef passage={passage} />
+                        </p>
+                      ) : (
+                        <Quote key={passage.id} passage={passage} />
+                      ),
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }
@@ -215,8 +323,8 @@ function LabelBadge({ label }: { label: ClassificationLabel }) {
   return (
     <span
       className={
-        "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium " +
-        LABEL_BADGE_CLASSES[label]
+        "inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold " +
+        BADGE[LABEL_TONE[label]]
       }
     >
       {LABEL_TEXT[label]}
@@ -317,30 +425,30 @@ export function SummaryStep({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         {(Object.keys(counts) as ClassificationResult["label"][]).map((label) => (
           <div key={label} className="flex items-center gap-3">
-            <span className="w-40 shrink-0 text-sm text-slate-700">{LABEL_TEXT[label]}</span>
-            <div className="h-2 flex-1 rounded-full bg-slate-100">
+            <span className="w-36 shrink-0 text-[14px] text-ink-2 sm:w-44">{LABEL_TEXT[label]}</span>
+            <div className="h-2.5 flex-1 rounded-full bg-paper-deep">
               <div
-                className="h-2 rounded-full bg-slate-900"
+                className={"h-2.5 rounded-full " + BAR[LABEL_TONE[label]]}
                 style={{ width: `${((counts[label] ?? 0) / total) * 100}%` }}
               />
             </div>
-            <span className="w-6 shrink-0 text-right text-sm text-slate-500">{counts[label]}</span>
+            <span className="w-6 shrink-0 text-right font-mono text-sm font-semibold text-ink-3">{counts[label]}</span>
           </div>
         ))}
       </div>
 
       {unanswered.length > 0 ? (
-        <div className="flex flex-col gap-3 rounded-md border border-orange-200 bg-orange-50/40 p-4">
+        <div className="flex flex-col gap-4 rounded-lg border border-[#f2b8b0] bg-[#fff7f5] p-5">
           <div>
-            <p className="text-sm font-medium text-slate-900">
+            <p className="font-title text-2xl font-bold uppercase leading-none text-stamp">
               {unanswered.length} of {total} request{total === 1 ? " was" : "s were"} not fully
               answered
             </p>
-            <p className="mt-0.5 text-[13px] text-slate-600">
+            <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
               Select the ones you still want. You can draft a first appeal against this reply, or
               start a follow-up RTI with them and the context from this reply.
             </p>
@@ -351,27 +459,27 @@ export function SummaryStep({
               return (
                 <label
                   key={request.id}
-                  className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 bg-white p-3"
+                  className="flex cursor-pointer items-start gap-3 rounded-md border border-edge bg-white p-3.5"
                 >
                   <input
                     type="checkbox"
                     checked={selected.has(request.id)}
                     onChange={() => toggle(request.id)}
-                    className="mt-0.5 h-4 w-4 shrink-0"
+                    className="mt-0.5 h-[18px] w-[18px] shrink-0 accent-ink-blue"
                   />
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="flex flex-wrap items-start justify-between gap-2">
-                      <span className="text-sm font-medium text-slate-900">{request.title}</span>
+                      <span className="font-serif text-[15px] font-semibold text-ink">{request.title}</span>
                       <LabelBadge label={result.label} />
                     </span>
-                    <span className="text-xs text-slate-600">{result.explanation}</span>
+                    <span className="text-[13px] leading-relaxed text-ink-3">{result.explanation}</span>
                   </span>
                 </label>
               );
             })}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">
+            <p className="text-[13px] text-muted">
               If the reply was incomplete, you can also file a First Appeal (Section 19(1)) within
               30 days of receiving it.
             </p>
@@ -386,7 +494,7 @@ export function SummaryStep({
                   disabled={selected.size === 0 || isDraftingAppeal}
                 >
                   {isDraftingAppeal ? (
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin" />
                   ) : (
                     <Scale size={14} />
                   )}
@@ -395,11 +503,11 @@ export function SummaryStep({
               )}
             </div>
           </div>
-          {appealError && <p className="text-[13px] text-red-600">{appealError}</p>}
+          {appealError && <p className="text-[14px] font-medium text-stamp">{appealError}</p>}
           {appealText && (
-            <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-slate-900">Your first appeal</p>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-title text-2xl font-bold uppercase leading-none text-ink">Your first appeal</p>
                 <div className="flex gap-2">
                   <SecondaryButton onClick={copyAppeal}>
                     {appealCopied ? <Check size={14} /> : <Copy size={14} />}
@@ -414,8 +522,10 @@ export function SummaryStep({
                   </SecondaryButton>
                 </div>
               </div>
-              <pre className="whitespace-pre-wrap font-mono text-xs text-slate-800">{appealText}</pre>
-              <p className="text-xs text-slate-500">
+              <Sheet className="px-5 pb-8 pt-10 sm:px-10">
+                <pre className="whitespace-pre-wrap break-words font-serif text-[14px] leading-[1.75] text-ink">{appealText}</pre>
+              </Sheet>
+              <p className="text-[13px] text-muted">
                 Fill in the parts in [brackets], read it through, and send it to the First Appellate
                 Authority within 30 days of the reply. This is not legal advice.
               </p>
@@ -423,8 +533,8 @@ export function SummaryStep({
           )}
         </div>
       ) : (
-        <div className="rounded-md border border-green-200 bg-green-50 p-4">
-          <p className="text-sm text-green-800">
+        <div className="rounded-lg border border-[#9fd5ae] bg-leaf-wash p-5">
+          <p className="text-[15px] font-medium text-leaf">
             Every request was answered or has a clear next step — no follow-up RTI needed.
           </p>
         </div>
@@ -432,20 +542,20 @@ export function SummaryStep({
 
       {others.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-sm font-medium text-slate-900">Other requests</p>
+          <p className="font-title text-2xl font-bold uppercase leading-none text-ink">Other requests</p>
           {others.map((request) => {
             const result = results[request.id];
             return (
               <div
                 key={request.id}
-                className="flex flex-col gap-1 rounded-md border border-slate-200 p-3"
+                className="flex flex-col gap-1 rounded-md border border-edge bg-card p-3.5"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <span className="text-sm text-slate-900">{request.title}</span>
+                  <span className="font-serif text-[15px] text-ink">{request.title}</span>
                   <LabelBadge label={result.label} />
                 </div>
                 {NEXT_STEP_HINT[result.label] && (
-                  <span className="text-xs text-slate-500">{NEXT_STEP_HINT[result.label]}</span>
+                  <span className="text-[13px] text-muted">{NEXT_STEP_HINT[result.label]}</span>
                 )}
               </div>
             );

@@ -7,9 +7,9 @@ import "./polaroids.css";
 const TILT = [-6, 4, -3, 5, -4, 3];
 const DROP = [22, 49, 62, 62, 49, 22];
 
-// "And more…": one polaroid per problem, pegged to a string, then the same problems as
-// buttons that start an RTI about them.
-export default function ProblemString({ onStart }: { onStart: (starter?: string) => void }) {
+// "And more…": one polaroid per problem, pegged to a string. The same problems are offered as
+// opening words on the first step of Draft your RTI.
+export default function ProblemString() {
   return (
     <section aria-labelledby="more-title" className="more-section">
       <div className="story-wrap more-inner">
@@ -49,17 +49,6 @@ export default function ProblemString({ onStart }: { onStart: (starter?: string)
               </li>
             ))}
           </ul>
-        </div>
-
-        <p id="pick-one" className="more-pick">
-          Pick one to start:
-        </p>
-        <div role="group" aria-labelledby="pick-one" className="more-buttons">
-          {PROBLEMS.map(({ label, starter }) => (
-            <button key={label} type="button" onClick={() => onStart(starter)} className="more-button">
-              {label}
-            </button>
-          ))}
         </div>
       </div>
     </section>

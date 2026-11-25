@@ -306,15 +306,16 @@ export default function RtiDraftingWizard({
       <PageHeader
         eyebrow={`Step ${stepNumber} of ${ALL_STEPS.length} · ${stepLabel}`}
         title={followUp ? "Draft your follow-up RTI" : "Draft your RTI application"}
+        accent="RTI"
         intro="Turn your complaint into an application that asks for the exact records PWD must keep."
       />
 
       <StepProgress steps={ALL_STEPS} currentId={step} />
 
       {followUp && (
-        <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 p-3">
-          <CornerDownRight size={16} className="mt-0.5 shrink-0 text-orange-700" />
-          <p className="text-[13px] text-orange-800">
+        <div className="flex max-w-3xl items-start gap-2.5 rounded-lg border border-[#f2b8b0] bg-[#fff7f5] p-4">
+          <CornerDownRight size={16} className="mt-0.5 shrink-0 text-stamp" />
+          <p className="text-[14px] text-ink-2">
             Follow-up RTI to {followUp.originalAuthority}. {followUp.requests.length} unanswered
             request{followUp.requests.length === 1 ? " was" : "s were"} carried over from the
             response analysis.
@@ -322,7 +323,7 @@ export default function RtiDraftingWizard({
         </div>
       )}
 
-      <StepCard>
+      <StepCard wide={step === "describe" || step === "check" || step === "draft"}>
         <StepCardBody>
           {step === "describe" && (
             <DescribeStep
@@ -392,7 +393,7 @@ export default function RtiDraftingWizard({
             />
           )}
 
-          {draftError && <p className="mt-3 text-[13px] text-red-600">{draftError}</p>}
+          {draftError && <p className="mt-3 text-[13.5px] font-medium text-stamp">{draftError}</p>}
         </StepCardBody>
 
         <StepCardActions>

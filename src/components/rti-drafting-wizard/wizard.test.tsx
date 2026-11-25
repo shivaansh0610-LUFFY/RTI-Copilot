@@ -291,3 +291,27 @@ test("the PIO review's improved version replaces the draft and is kept in My RTI
   expect(screen.getByText(new RegExp(`^${improved.length} / 3,000 characters`))).toBeTruthy();
   expect(onDraftReady).toHaveBeenLastCalledWith(expect.objectContaining({ draftText: improved }));
 });
+
+test("the PIO review's score is stamped on the sheet, and comes off when the text changes", async () => {
+  draftMock.mockResolvedValue(DRAFT);
+  vi.mocked(reviewDraft).mockResolvedValue({
+    score: 7,
+    outOf: 10,
+    verdict: "fix",
+    aiUsed: true,
+    checks: [{ id: "TRANSFER", label: "Asks for transfer", passed: false, why: "w", fix: "f", notes: [] }],
+    improved: { text: "I hereby request information.\n1. Copy of the work order", score: 8, fixed: ["TRANSFER"] },
+  });
+  render(<RtiDraftingWizard followUp={FOLLOW_UP} />);
+  await toDraft();
+  const sheet = screen.getByText("Your application").closest(".paper-sheet") as HTMLElement;
+  expect(within(sheet).queryByText("PIO SCORE")).toBeNull();
+
+  fireEvent.click(screen.getByRole("button", { name: /check like a pio/i }));
+  await waitFor(() => expect(within(sheet).getByText("7/10")).toBeTruthy());
+  expect(within(sheet).getByText("PIO SCORE")).toBeTruthy();
+
+  // The improved version is new text that has not been checked yet.
+  fireEvent.click(screen.getByRole("button", { name: /use this version/i }));
+  expect(within(sheet).queryByText("7/10")).toBeNull();
+});
