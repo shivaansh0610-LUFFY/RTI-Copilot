@@ -55,7 +55,7 @@ export default function Hero({
   return (
     <section
       aria-labelledby="hero-title"
-      className="story-wrap hero"
+      className="hero"
       onFocus={() => setFocused(true)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
@@ -83,48 +83,51 @@ export default function Hero({
         })}
         <div className="hero-shade" style={{ background: SHADE }} />
 
-        <div className="hero-top">
-          <div className="hero-note">
-            <p className="hero-note-question">{slide.question}</p>
-            <p className="hero-note-ask">
-              <span>Ask for:</span> {slide.ask}
+        {/* The photo fills the window; the words line up with the rest of the page. */}
+        <div className="story-wrap hero-inner">
+          <div className="hero-top">
+            <div className="hero-note">
+              <p className="hero-note-question">{slide.question}</p>
+              <p className="hero-note-ask">
+                <span>Ask for:</span> {slide.ask}
+              </p>
+            </div>
+          </div>
+
+          <div className="hero-text">
+            <p className="hero-eyebrow">Every road, drain and bridge is built with public money</p>
+            <h1 id="hero-title" className="hero-title">
+              Complaint ignored? <br />
+              <span>Make them answer.</span>
+            </h1>
+            <p className="hero-lede">
+              RTI Copilot turns a civic problem into an RTI application that asks for the exact
+              records PWD must keep, reads the reply you get back, and drafts your appeal if it falls
+              short. You file it yourself.
+            </p>
+            <div className="hero-actions">
+              <button type="button" onClick={() => onStart()} className="hero-btn hero-btn-primary">
+                Start my RTI
+                <ArrowRight size={18} aria-hidden="true" />
+              </button>
+              {onReview && (
+                <button type="button" onClick={() => onReview()} className="hero-btn hero-btn-ghost">
+                  <ShieldCheck size={18} aria-hidden="true" />
+                  Check my draft
+                </button>
+              )}
+              <button type="button" onClick={() => onAnalyse()} className="hero-btn hero-btn-ghost">
+                <Scale size={18} aria-hidden="true" />I got a reply
+              </button>
+            </div>
+            <p className="hero-independent">
+              An independent citizen tool. Not a government website, and not run by PWD Delhi.
             </p>
           </div>
         </div>
-
-        <div className="hero-text">
-          <p className="hero-eyebrow">Every road, drain and bridge is built with public money</p>
-          <h1 id="hero-title" className="hero-title">
-            Complaint ignored? <br />
-            <span>Make them answer.</span>
-          </h1>
-          <p className="hero-lede">
-            RTI Copilot turns a civic problem into an RTI application that asks for the exact
-            records PWD must keep, reads the reply you get back, and drafts your appeal if it falls
-            short. You file it yourself.
-          </p>
-          <div className="hero-actions">
-            <button type="button" onClick={() => onStart()} className="hero-btn hero-btn-primary">
-              Start my RTI
-              <ArrowRight size={18} aria-hidden="true" />
-            </button>
-            {onReview && (
-              <button type="button" onClick={() => onReview()} className="hero-btn hero-btn-ghost">
-                <ShieldCheck size={18} aria-hidden="true" />
-                Check my draft
-              </button>
-            )}
-            <button type="button" onClick={() => onAnalyse()} className="hero-btn hero-btn-ghost">
-              <Scale size={18} aria-hidden="true" />I got a reply
-            </button>
-          </div>
-          <p className="hero-independent">
-            An independent citizen tool. Not a government website, and not run by PWD Delhi.
-          </p>
-        </div>
       </div>
 
-      <div className="hero-below">
+      <div className="story-wrap hero-below">
         <dl className="hero-facts">
           <div>
             <dt>official documents it reads, from the RTI Act to the CPWD Works Manual</dt>

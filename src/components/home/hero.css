@@ -1,16 +1,32 @@
+/* The first screen: the photo runs edge to edge and fills the window under the nav bar
+   (57px high on a phone, 65px from 640px up), never shorter than its words need. */
 .hero {
-  padding-top: 16px;
+  --nav-height: 57px;
+}
+
+@media (min-width: 640px) {
+  .hero {
+    --nav-height: 65px;
+  }
 }
 
 .hero-panel {
   position: relative;
   display: flex;
+  min-height: max(560px, calc(100vh - var(--nav-height)));
+  min-height: max(560px, calc(100svh - var(--nav-height)));
+  overflow: hidden;
+  background: #c9d2da;
+}
+
+/* The note and the words, inside the page's width so they line up with the logo. */
+.hero-inner {
+  position: relative;
+  z-index: 4;
+  display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: clamp(560px, 50vw, 720px);
-  overflow: hidden;
-  border-radius: clamp(14px, 1.8vw, 24px);
-  background: #c9d2da;
+  width: 100%;
 }
 
 .hero-photo {
@@ -38,7 +54,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: clamp(16px, 2.4vw, 32px) clamp(16px, 2.4vw, 32px) 0;
+  padding-top: clamp(16px, 3.5vh, 40px);
 }
 
 .hero-note {
@@ -78,7 +94,7 @@
   position: relative;
   z-index: 4;
   max-width: 820px;
-  padding: clamp(20px, 4vw, 56px);
+  padding-block: clamp(28px, 5vh, 56px) clamp(32px, 8vh, 88px);
   color: #fff;
   text-shadow:
     0 1px 2px rgba(0, 0, 0, 0.25),
