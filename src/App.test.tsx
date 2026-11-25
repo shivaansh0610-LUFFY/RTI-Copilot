@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { expect, test, vi } from "vitest";
 import App from "./App";
 import { PROBLEMS, REPAIR_STARTER } from "./components/home/problems";
 
@@ -16,14 +16,39 @@ function homeHeading() {
   return screen.queryByRole("heading", { level: 1, name: "Complaint ignored? Make them answer." });
 }
 
-test("opens on the home page, and a problem tile starts the description", () => {
+test("opens on the home page; the first step offers the problems as opening words", () => {
   render(<App />);
   expect(homeHeading()).toBeTruthy();
+  expect(screen.queryByRole("button", { name: PROBLEMS[2].label })).toBeNull();
+
+  fireEvent.click(homeButton(/start my rti/i));
+  expect(homeHeading()).toBeNull();
+  const problems = within(screen.getByRole("group", { name: "Common problems" })).getAllByRole("button");
+  expect(problems.map((b) => b.textContent)).toEqual(PROBLEMS.map((p) => p.label));
 
   fireEvent.click(screen.getByRole("button", { name: PROBLEMS[2].label }));
-
-  expect(homeHeading()).toBeNull();
   expect(description().value).toBe(PROBLEMS[2].starter);
+  expect(screen.getByRole("button", { name: PROBLEMS[2].label }).getAttribute("aria-pressed")).toBe("true");
+});
+
+test("picking another problem swaps only the opening words; your own words need a yes first", () => {
+  render(<App />);
+  fireEvent.click(homeButton(/start my rti/i));
+  fireEvent.click(screen.getByRole("button", { name: PROBLEMS[0].label }));
+  fireEvent.change(description(), { target: { value: PROBLEMS[0].starter + "Ring Road, near the bus stop." } });
+
+  fireEvent.click(screen.getByRole("button", { name: PROBLEMS[3].label }));
+  expect(description().value).toBe(PROBLEMS[3].starter + "Ring Road, near the bus stop.");
+
+  fireEvent.change(description(), { target: { value: "My own words about the road." } });
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  fireEvent.click(screen.getByRole("button", { name: PROBLEMS[1].label }));
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(description().value).toBe("My own words about the road.");
+
+  confirm.mockReturnValue(true);
+  fireEvent.click(screen.getByRole("button", { name: PROBLEMS[1].label }));
+  expect(description().value).toBe(PROBLEMS[1].starter);
 });
 
 test("the plain start button keeps a description already in progress", () => {

@@ -10,7 +10,7 @@ import RightToInformation from "./RightToInformation";
 import "./story.css";
 
 // The home page, told as a story in chapters: the slideshow hero, what RTI is, the problem,
-// the records worth asking for, how it works (with the demo), the problems to start from,
+// the records worth asking for, how it works (with the demo), the problems it can help with,
 // and a call to ask.
 export default function HomePage({
   onStart,
@@ -34,7 +34,7 @@ export default function HomePage({
         <ProblemCollage />
         <RecordStrips onStart={onStart} />
         <HowItWorks />
-        <ProblemString onStart={onStart} />
+        <ProblemString />
         <Closing onStart={startBlank} onAnalyse={onAnalyse} onReview={onReview} />
       </main>
       <StoryFooter />

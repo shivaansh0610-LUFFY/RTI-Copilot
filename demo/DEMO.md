@@ -18,9 +18,9 @@ for the right ones and are not fobbed off.
 
 0. **Home page.** Scroll the story: the slideshow (each slide pairs a problem with the record
    to ask for), Right to Information, the five records (open a strip or two), then **How it
-   works**: press play on the application sheet for the 30-second demo. Under the polaroids,
-   the problems are only things PWD is responsible for on its roads. Click **Pothole or
-   broken road**.
+   works**: press play on the application sheet for the 30-second demo. The polaroids show
+   only problems PWD is responsible for on its roads. Click **Start my RTI**, then **Pothole
+   or broken road** in "Pick one to start", beside the description box.
 1. **Describe.** Replace the starter sentence with:
    > There is a big pothole on Ring Road near Lajpat Nagar metro station. It has been there
    > for about 6 months, two-wheelers fall almost every week, and nobody from PWD has repaired

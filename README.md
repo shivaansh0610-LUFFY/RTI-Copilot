@@ -80,7 +80,8 @@ The whole RTI loop runs end to end, for road grievances against PWD Delhi:
 
 Around it: a home page that tells the story in chapters (a slideshow of road problems and
 the record that answers each, the five records Section 2(j) lets you ask for, a 30-second demo
-that plays on the application sheet, and the problems PWD handles to start from), **My RTIs**
+that plays on the application sheet, and polaroids of the problems PWD handles; the first step
+of the draft offers those problems as opening words), **My RTIs**
 (every draft kept in the browser, with the reply due date and the appeal window once the
 filing date is entered), and print / save as PDF for the draft and the appeal. Inputs are
 size-limited on the API.

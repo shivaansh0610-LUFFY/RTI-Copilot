@@ -13,8 +13,10 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { postalLetterHeading, postalLetterText, printText, printTextWithPhotos } from "../../print";
+import { PROBLEMS } from "../home/problems";
 import PioReview from "../pio-review/PioReview";
 import type {
   ApplicantDetails,
@@ -58,44 +60,89 @@ export function DescribeStep({
   onLocationChange: (location: IssueLocation | undefined) => void;
 }) {
   const picker = useLocationPicker(onLocationChange);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const chosen = PROBLEMS.find((problem) => grievance.startsWith(problem.starter));
+
+  // A problem writes its opening words into the description. Picking another swaps only those
+  // words and keeps the rest; words of the citizen's own are replaced only after a yes.
+  function pick(starter: string) {
+    let next = starter;
+    if (chosen) next = starter + grievance.slice(chosen.starter.length);
+    else if (grievance.trim() && !window.confirm("Replace what you have written with these opening words?")) return;
+    // Shown at once, so the cursor can wait at the end of the words before the next key.
+    flushSync(() => onChange(next));
+    field.current?.focus();
+    field.current?.setSelectionRange(next.length, next.length);
+  }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <label htmlFor="grievance" className="font-serif text-[17px] font-semibold text-ink">
-          Describe your issue in plain language
-        </label>
-        <button
-          type="button"
-          onClick={picker.locateDevice}
-          disabled={picker.isLocating}
-          className="flex min-h-9 items-center gap-1.5 rounded-full border border-edge-strong bg-card px-3 text-[13px] font-medium text-ink-3 hover:border-ink-3 disabled:opacity-60"
-        >
-          {picker.isLocating ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <MapPin size={13} />
-          )}
-          Use my current location
-        </button>
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_312px] lg:gap-8">
+      <PaperCard title="Pick one to start" className="lg:col-start-2 lg:row-start-1 lg:self-start">
+        <p className="text-[13.5px] leading-relaxed text-ink-3">
+          It writes the first words for you. Then add where it is and what you have seen.
+        </p>
+        <div role="group" aria-label="Common problems" className="mt-3.5 flex flex-wrap gap-2 lg:flex-col">
+          {PROBLEMS.map(({ label, icon: Icon, starter }) => {
+            const isChosen = chosen?.starter === starter;
+            return (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={isChosen}
+                onClick={() => pick(starter)}
+                className={
+                  "flex min-h-11 items-center gap-2.5 rounded-full border px-4 text-left text-[14.5px] font-medium transition-colors lg:rounded-md lg:px-3.5 " +
+                  (isChosen
+                    ? "border-ink-blue bg-ink-blue text-white"
+                    : "border-edge-strong bg-white text-ink hover:border-ink-blue hover:text-ink-blue")
+                }
+              >
+                <Icon size={16} aria-hidden="true" className={"shrink-0 " + (isChosen ? "" : "text-ink-blue")} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </PaperCard>
+
+      <div className="flex min-w-0 flex-col gap-2 lg:col-start-1 lg:row-start-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <label htmlFor="grievance" className="font-serif text-[17px] font-semibold text-ink">
+            Describe your issue in plain language
+          </label>
+          <button
+            type="button"
+            onClick={picker.locateDevice}
+            disabled={picker.isLocating}
+            className="flex min-h-9 items-center gap-1.5 rounded-full border border-edge-strong bg-card px-3 text-[13px] font-medium text-ink-3 hover:border-ink-3 disabled:opacity-60"
+          >
+            {picker.isLocating ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <MapPin size={13} />
+            )}
+            Use my current location
+          </button>
+        </div>
+        <textarea
+          ref={field}
+          id="grievance"
+          value={grievance}
+          onChange={(e) => onChange(e.target.value)}
+          rows={7}
+          // The API takes 5,000 characters; this leaves room for the "Location:" line the map adds.
+          maxLength={4800}
+          placeholder="e.g. The road in front of my house has been broken for two years and no one has repaired it..."
+          className="paper-field p-4 font-serif text-[15.5px] leading-relaxed"
+        />
+        {error && <p className="text-[13.5px] font-medium text-stamp">{error}</p>}
+        <PhotoLocation
+          photos={photos}
+          onPhotosChange={onPhotosChange}
+          location={location}
+          picker={picker}
+        />
       </div>
-      <textarea
-        id="grievance"
-        value={grievance}
-        onChange={(e) => onChange(e.target.value)}
-        rows={7}
-        // The API takes 5,000 characters; this leaves room for the "Location:" line the map adds.
-        maxLength={4800}
-        placeholder="e.g. The road in front of my house has been broken for two years and no one has repaired it..."
-        className="paper-field p-4 font-serif text-[15.5px] leading-relaxed"
-      />
-      {error && <p className="text-[13.5px] font-medium text-stamp">{error}</p>}
-      <PhotoLocation
-        photos={photos}
-        onPhotosChange={onPhotosChange}
-        location={location}
-        picker={picker}
-      />
     </div>
   );
 }
