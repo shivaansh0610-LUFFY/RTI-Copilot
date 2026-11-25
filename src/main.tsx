@@ -15,6 +15,7 @@ import '@fontsource/noto-serif/600-italic.css'
 import '@fontsource/khand/600.css'
 import '@fontsource/khand/700.css'
 import '@fontsource/kalam/400.css'
+import '@fontsource/kalam/700.css'
 import './index.css'
 import App from './App.tsx'
 

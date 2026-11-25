@@ -121,18 +121,26 @@ const NAV: { view: Exclude<View, "home">; icon: LucideIcon; short: string; full:
   { view: "rtis", icon: ListChecks, short: "My RTIs", full: "My RTIs" },
 ];
 
-// The folder-and-tick of the favicon.
+// The logo: RTI with a pen nib for the I, and "copilot" written by hand in ink blue, like the
+// notes in the app's margins. The nib's hole and slit are cut out, so the paper shows through.
+// Screen readers hear the name from the button instead.
 function Logo() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 28 28" fill="none" className="h-[22px] w-[22px] shrink-0 sm:h-7 sm:w-7">
-      <path
-        d="M3 7.5a2 2 0 0 1 2-2h5.2l2.3 2.6H23a2 2 0 0 1 2 2V21a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-        stroke="#1F3A8A"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path d="m9.5 15.4 3 3 6-6.2" stroke="#B0893F" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <span aria-hidden="true" className="flex items-end">
+      <span className="font-title text-[25px] font-bold leading-[0.74] tracking-[0.02em] text-ink sm:text-[30px]">
+        RT
+      </span>
+      <svg viewBox="0 0 12 22" className="ml-0.5 h-[18px] w-[10px] shrink-0 fill-ink-blue sm:h-[22px] sm:w-3">
+        <rect x="0.5" width="11" height="4" rx="1" />
+        <path
+          fillRule="evenodd"
+          d="M6 22 .5 11.6V5.6h11v6zM4.5 12.2a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0zM5.4 13.7h1.2V21H5.4z"
+        />
+      </svg>
+      <span className="ml-1 -translate-y-px -rotate-[4deg] font-hand text-[18px] font-bold leading-none text-ink-blue sm:text-[22px]">
+        copilot
+      </span>
+    </span>
   );
 }
 
@@ -157,10 +165,10 @@ export function SiteHeader({
         <button
           type="button"
           onClick={() => onNavigate("home")}
-          className="flex shrink-0 items-center gap-1.5 whitespace-nowrap font-serif text-[15px] font-semibold text-ink sm:gap-2.5 sm:text-[19px]"
+          className="flex shrink-0 items-center whitespace-nowrap rounded-sm py-1"
         >
           <Logo />
-          RTI Copilot
+          <span className="sr-only">RTI Copilot</span>
         </button>
         <nav aria-label="Main" className="flex gap-0.5 sm:gap-1">
           {NAV.map(({ view: target, icon: Icon, short, full }) => {
