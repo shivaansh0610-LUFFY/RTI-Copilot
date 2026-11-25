@@ -1,0 +1,43 @@
+# The API on Render's free plan (512 MB, Docker), deployed only after CI passes on main.
+# The website is on Vercel and the database on Neon; see deploy/README.md for every step.
+# Values marked `sync: false` are secrets: Render asks for them when the Blueprint is created,
+# and they never go in this file.
+services:
+  - type: web
+    name: rti-copilot-api
+    runtime: docker
+    plan: free
+    # Next to the Neon database (AWS US East).
+    region: virginia
+    branch: main
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      # A slim image: no PyTorch, no model. Search queries are embedded on Cloudflare instead.
+      - key: LOCAL_EMBEDDINGS
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: USE_LLM_DRAFTING
+        value: "true"
+      - key: USE_CORPUS_CITATIONS
+        value: "true"
+      - key: USE_PUBLIC_INFO_LOOKUP
+        value: "false"
+      - key: CORS_ORIGINS
+        value: '["https://rti-copilot.vercel.app"]'
+      # Scanned replies read at 200 dpi instead of 300: about a minute a page on a tenth of a CPU
+      # instead of a minute and a half, with the same words read in testing (ingest/extract.py).
+      - key: OCR_DPI
+        value: "200"

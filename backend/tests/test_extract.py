@@ -215,6 +215,62 @@ def test_ocr_failure_leaves_the_page_as_pypdf_found_it(monkeypatch, tmp_path):
     assert pdf_pages(path) == [""]
 
 
+@pytest.mark.parametrize("setting, dpi", [(None, 300), ("", 300), ("200", 200)], ids=["unset", "empty", "200"])
+def test_ocr_renders_at_300_dpi_unless_the_server_sets_ocr_dpi(monkeypatch, tmp_path, setting, dpi):
+    import pymupdf
+    from PIL import Image
+
+    widths = []
+
+    def _read(image_bytes):
+        widths.append(Image.open(io.BytesIO(image_bytes)).width)
+        return "Scanned text"
+
+    monkeypatch.setattr(extract, "_recognize_text", _read)
+    if setting is None:
+        monkeypatch.delenv("OCR_DPI", raising=False)
+    else:
+        monkeypatch.setenv("OCR_DPI", setting)
+    path = tmp_path / "scan.pdf"
+    path.write_bytes(make_pdf([[]]))
+
+    assert pdf_pages(path) == ["Scanned text"]
+    page_width_in_points = pymupdf.open(path)[0].rect.width
+    assert widths[0] == pytest.approx(page_width_in_points / 72 * dpi, abs=1)
+
+
+def test_the_pdf_cache_is_emptied_after_every_ocr_page(monkeypatch, tmp_path):
+    # Otherwise MuPDF's cache grows about 20 MB per scanned page, and a long scanned reply runs a
+    # small (512 MB) server out of memory.
+    import pymupdf
+
+    shrinks = []
+    monkeypatch.setattr(pymupdf.TOOLS, "store_shrink", lambda percent: shrinks.append(percent))
+    monkeypatch.setattr(extract, "_recognize_text", lambda image_bytes: "Scanned text")
+    path = tmp_path / "scan.pdf"
+    path.write_bytes(make_pdf([[], [], []]))
+
+    assert pdf_pages(path) == ["Scanned text"] * 3
+    assert shrinks == [100, 100, 100]
+
+
+def test_the_pdf_cache_is_emptied_even_when_ocr_fails(monkeypatch, tmp_path):
+    import pymupdf
+
+    shrinks = []
+    monkeypatch.setattr(pymupdf.TOOLS, "store_shrink", lambda percent: shrinks.append(percent))
+
+    def _broken(image_bytes):
+        raise RuntimeError("tesseract binary not found")
+
+    monkeypatch.setattr(extract, "_recognize_text", _broken)
+    path = tmp_path / "scan.pdf"
+    path.write_bytes(make_pdf([[]]))
+
+    assert pdf_pages(path) == [""]
+    assert shrinks == [100]
+
+
 # A real Adobe Scan page whose embedded text layer pypdf decoded wrong: plenty of characters,
 # almost none of them forming a real word, so OCR_THRESHOLD_CHARS alone never catches it.
 GARBLED_PAGE = (

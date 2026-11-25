@@ -37,6 +37,9 @@ logging.getLogger("pypdf").setLevel(logging.ERROR)
 # A page pypdf reads as emptier than this is treated as scanned, not blank, and sent to OCR.
 # A handful of stray characters (a page number, a stamp) should not count as "has text".
 OCR_THRESHOLD_CHARS = 20
+# The resolution scanned pages are rendered at for OCR. A server can lower it with the OCR_DPI
+# environment variable: the free Render plan (a tenth of a CPU) sets 200, which read a test reply
+# just as well in about 60 s a page instead of 95 s.
 OCR_DPI = 300
 
 # A scanning app (Adobe Scan and others) can embed a text layer whose font encoding pypdf
@@ -179,12 +182,17 @@ def _ocr_page(pdf_bytes: bytes, page_index: int) -> str:
 
     try:
         with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
-            pixmap = doc[page_index].get_pixmap(dpi=OCR_DPI)
+            pixmap = doc[page_index].get_pixmap(dpi=int(os.environ.get("OCR_DPI") or OCR_DPI))
             image_bytes = pixmap.tobytes("png")
         return _recognize_text(image_bytes)
     except Exception:
         logging.getLogger(__name__).warning("OCR failed on page %d", page_index + 1, exc_info=True)
         return ""
+    finally:
+        # MuPDF keeps what it decoded in a cache that outlives the document, about 20 MB more
+        # per scanned page: a 20-page scan overran a 512 MB server. Emptied here, the process
+        # stays flat however many pages are read.
+        pymupdf.TOOLS.store_shrink(100)
 
 
 def html_text(raw: bytes) -> str:

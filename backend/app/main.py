@@ -13,7 +13,11 @@ from app.services import embeddings, pwd_road_projects
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    embeddings.use_cpu()  # see app.services.embeddings: MPS crashes from worker threads
+    if settings.cloudflare_account_id and settings.cloudflare_api_token:
+        # A small server: the same model runs on Cloudflare instead of in this process.
+        embeddings.use_cloudflare(settings.cloudflare_account_id, settings.cloudflare_api_token)
+    else:
+        embeddings.use_cpu()  # see app.services.embeddings: MPS crashes from worker threads
     if settings.use_corpus_citations and settings.use_llm_drafting:
         # Loading the embedding model takes a while; do it now, off the request path.
         threading.Thread(target=embeddings.warm_up, name="embedding-warm-up", daemon=True).start()

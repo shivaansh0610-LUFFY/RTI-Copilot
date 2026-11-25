@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Off by default: needs the corpus loaded, and loads the 1.3 GB embedding model into the API.
     # When set (with use_llm_drafting), each generated request cites the manual passage it rests on.
     use_corpus_citations: bool = False
+    # Both set: the API embeds search queries on Cloudflare Workers AI (the same model, free)
+    # instead of loading it, so it fits a 512 MB server. See app.services.embeddings.
+    cloudflare_account_id: str = ""
+    cloudflare_api_token: str = ""
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 

@@ -191,9 +191,9 @@ the router tests always run on SQLite and need no database.
 
 ## Deploying
 
-The app can run for free: the website on Vercel, the API on a Hugging Face Space and the
-database on Neon. The steps, and how the tests guard every deploy, are in
-[deploy/README.md](deploy/README.md).
+The app can run for free: the website on Vercel, the API on Render (with its search queries
+embedded on Cloudflare Workers AI, so it fits in 512 MB) and the database on Neon. The steps,
+and how the tests guard every deploy, are in [deploy/README.md](deploy/README.md).
 
 ## References
 
