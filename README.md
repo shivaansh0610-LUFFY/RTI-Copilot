@@ -189,6 +189,12 @@ The tests never load that model. A few of them (`test_load_documents.py`,
 scratch schema and drop it afterwards. Without it they run on SQLite or skip;
 the router tests always run on SQLite and need no database.
 
+## Deploying
+
+The app can run for free: the website on Vercel, the API on a Hugging Face Space and the
+database on Neon. The steps, and how the tests guard every deploy, are in
+[deploy/README.md](deploy/README.md).
+
 ## References
 
 - [Right to Information portal](https://rti.gov.in/)
