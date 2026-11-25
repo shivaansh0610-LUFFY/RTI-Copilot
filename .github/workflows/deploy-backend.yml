@@ -1,0 +1,70 @@
+name: Deploy backend
+
+# Sends backend/ to the Hugging Face Space that runs the API, only after CI has passed on main,
+# so nothing reaches the live server without passing the tests first. "Run workflow" on the
+# Actions tab deploys main by hand (the first time, for instance).
+#
+# Does nothing until the repository has, under Settings > Secrets and variables > Actions:
+#   - the variable HF_SPACE: the Space's name, as owner/space-name
+#   - the secret HF_TOKEN: a Hugging Face access token that can write to that Space
+# The Space keeps its own settings (database URL, Groq key, CORS_ORIGINS): see deploy/README.md.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy the API to Hugging Face
+    if: >-
+      vars.HF_SPACE != '' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The commit CI passed on, not whatever main is by now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install "huggingface_hub>=0.25"
+      - name: Upload backend/ to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        # The Hub's upload, not git push: it stores the two OCR language files (binary) the way
+        # the Hub requires. The Space reads its settings from the front matter of its README.
+        run: |
+          printf -- '---\ntitle: RTI Copilot API\nsdk: docker\napp_port: 8000\npinned: false\n---\n\nThe API behind RTI Copilot, deployed from https://github.com/%s.\n' \
+            "$GITHUB_REPOSITORY" > backend/README.md
+          python - <<'EOF'
+          import os
+          import subprocess
+
+          from huggingface_hub import HfApi
+
+          commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+          HfApi(token=os.environ["HF_TOKEN"]).upload_folder(
+              repo_id=os.environ["HF_SPACE"],
+              repo_type="space",
+              folder_path="backend",
+              ignore_patterns=[".venv/**", "**/__pycache__/**", ".pytest_cache/**", "tests/**", "data/corpus/**"],
+              delete_patterns=["**"],
+              commit_message=f"Deploy {commit} from GitHub",
+          )
+          print(f"Deployed {commit}")
+          EOF
