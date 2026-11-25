@@ -64,23 +64,32 @@ your own `.env` (which git ignores).
    | `CLOUDFLARE_ACCOUNT_ID` | from step 2 |
    | `CLOUDFLARE_API_TOKEN` | from step 2 |
 
-4. Apply. The first build takes a few minutes. When it is live,
-   `https://rti-copilot-api.onrender.com/health` (or the address Render shows) answers
-   `{"status":"ok"}`.
+4. Apply. The first build takes a few minutes. When it is live, the address Render shows plus
+   `/health` answers `{"status":"ok"}`. This project's API is
+   `https://rti-copilot-api-mp4y.onrender.com` (Render added `-mp4y` to the service name).
+
+If the server stops at start with "connection to server at 127.0.0.1", `DATABASE_URL` holds a
+laptop database: set it to the Neon URL (Environment, then Save, rebuild, and deploy).
 
 From then on, every push to `main` that passes CI redeploys the API by itself.
 
 ## 4. The website (Vercel)
 
 1. Sign up at [vercel.com](https://vercel.com) with GitHub, then Add New, Project, and import
-   this repository. Vercel recognises Vite: build `npm run build`, output `dist`.
-2. Name the project `rti-copilot`, so the site is `https://rti-copilot.vercel.app`.
+   this repository. Vercel finds two apps in it: choose **Import single project** on the
+   **app (Vite)** row. The API runs on Render, so no `vercel.json` and no "Services". Build
+   `npm run build`, output `dist`.
+2. Name the project. This one is `rti-copilot-app01`, so the site is
+   `https://rti-copilot-app01.vercel.app` (`rti-copilot.vercel.app` belongs to someone else).
 3. Add the environment variable `VITE_API_URL` = the Render address from step 3 (no `/` at the
-   end), for **Production**. Preview builds without it run on the built-in sample data.
+   end), for **Production**, before the first deploy. It is built into the site, so adding or
+   changing it later needs a Redeploy (Deployments, ⋯, Redeploy). Without it the site runs on
+   the built-in sample data.
 4. Deploy. Every push to `main` rebuilds the site.
 
-If Vercel gives the site another address, put it in the Render service's `CORS_ORIGINS`
-(Environment), in exactly this form: `["https://the-address.vercel.app"]`.
+The API only answers the site address in `CORS_ORIGINS` in [`render.yaml`](../render.yaml), in
+exactly this form: `["https://the-address.vercel.app"]`. If the site's address changes, change it
+there, not only in Render's dashboard, which a later Blueprint sync can overwrite.
 
 ## 5. Check it works
 
