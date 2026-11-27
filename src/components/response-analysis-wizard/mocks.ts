@@ -26,10 +26,30 @@ async function failure(response: Response): Promise<Error> {
   return new Error(`The server answered with status ${response.status}. Please try again.`);
 }
 
+// With a backend, a reply can be analysed without drafting here: it gets a case of its own.
+export function canAnalyseWithoutDraft(): boolean {
+  return Boolean(API_URL);
+}
+
+// POST /cases: an empty case to hang a reply to an RTI not drafted here on.
+export async function startReplyCase(): Promise<string> {
+  const response = await apiFetch(`${API_URL}/cases`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ grievanceText: "Analysing a reply from a Public Information Officer." }),
+  });
+  if (!response.ok) throw await failure(response);
+  const { caseId } = (await response.json()) as { caseId: string };
+  return caseId;
+}
+
 // POST /cases/:id/response (multipart upload): passages and one finding per stored request.
-export async function analyseResponse(caseId: string, file: File): Promise<ResponseAnalysis> {
+// For a case with no requests, `questions` (pasted by the citizen) become them; without
+// questions the server reads the points from the reply itself and returns them as `requests`.
+export async function analyseResponse(caseId: string, file: File, questions?: string): Promise<ResponseAnalysis> {
   const form = new FormData();
   form.append("file", file);
+  if (questions?.trim()) form.append("questions", questions.trim());
   const response = await apiFetch(`${API_URL}/cases/${caseId}/response`, { method: "POST", body: form });
   if (!response.ok) throw await failure(response);
   return response.json();

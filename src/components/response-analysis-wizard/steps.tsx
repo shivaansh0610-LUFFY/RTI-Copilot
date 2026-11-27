@@ -63,7 +63,12 @@ export function UploadStep({
   isProcessing,
   processingError,
   ingestResult,
+  questions,
+  onQuestionsChange,
 }: {
+  // Shown only for a reply to an RTI not drafted here: what the citizen asked, optional.
+  questions?: string;
+  onQuestionsChange?: (questions: string) => void;
   file: File | null;
   onFileSelect: (file: File | null) => void;
   onProcess: () => void;
@@ -91,6 +96,28 @@ export function UploadStep({
           onChange={(e) => onFileSelect(e.target.files?.[0] ?? null)}
         />
       </label>
+
+      {questions !== undefined && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="reply-questions" className="font-serif text-[17px] font-semibold text-ink">
+            What did you ask? <span className="font-sans text-sm font-normal text-muted">(optional)</span>
+          </label>
+          <p className="text-[13.5px] leading-relaxed text-muted">
+            Paste the questions from your RTI application, one per line, and each is checked against the
+            reply. Leave it empty and we read the points the reply itself answers.
+          </p>
+          <textarea
+            id="reply-questions"
+            value={questions}
+            onChange={(e) => onQuestionsChange?.(e.target.value)}
+            rows={4}
+            maxLength={5000}
+            disabled={Boolean(ingestResult)}
+            placeholder={"e.g. 1. Copy of the work order for the repair of Ring Road\n2. Copies of the Measurement Book entries"}
+            className="rounded-lg border border-edge-strong bg-white px-4 py-3 font-serif text-[15px] leading-relaxed text-ink"
+          />
+        </div>
+      )}
 
       {processingFailed && (
         <div className="flex items-start gap-2.5 rounded-lg border border-[#f2b8b0] bg-[#fff7f5] p-4">
@@ -225,10 +252,12 @@ export function ClassifyStep({
   requests,
   results,
   passages,
+  summary,
 }: {
   requests: InformationRequest[];
   results: Record<string, ClassificationResult>;
   passages: ResponsePassage[];
+  summary?: string;
 }) {
   const findings = requests
     .map((request, index) => ({ request, n: index + 1, result: results[request.id] }))
@@ -246,6 +275,19 @@ export function ClassifyStep({
 
   return (
     <div className="flex flex-col gap-5">
+      {summary && (
+        <section
+          aria-labelledby="reply-summary-heading"
+          className="rounded-lg border border-edge bg-white p-5 shadow-[0_2px_0_#ECE3D1,0_18px_40px_rgba(28,25,23,0.10)] sm:p-7"
+        >
+          <p className="font-mono text-[12px] font-semibold uppercase tracking-[0.12em] text-brown">In simple words</p>
+          <h2 id="reply-summary-heading" className="mt-1.5 font-title text-[32px] font-bold uppercase leading-none text-ink sm:text-[38px]">
+            What the reply says
+          </h2>
+          <p className="mt-3 max-w-[58em] font-serif text-[16.5px] leading-[1.7] text-ink sm:text-[18px]">{summary}</p>
+          <p className="mt-3 text-[13px] text-muted">Written by AI from the reply. Check it against the reply below.</p>
+        </section>
+      )}
       <p aria-hidden="true" className="flex flex-wrap gap-x-5 gap-y-2 text-[13.5px] text-ink-3">
         <span><span className="hl hl-good">Answered</span></span>
         <span><span className="hl hl-part">Partly answered</span></span>

@@ -113,6 +113,11 @@ export interface ResponseAnalysis {
   ocrUsed: boolean;
   passages: ResponsePassage[];
   results: ClassificationResult[];
+  // The reply in simple words, written by the AI in the same call (absent when it gave none).
+  summary?: string;
+  // Only for a reply to an RTI not drafted here: what the results are for (the pasted
+  // questions, or the points read from the reply itself).
+  requests?: InformationRequest[];
 }
 
 export interface AppealItem {
