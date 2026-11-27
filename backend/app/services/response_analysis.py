@@ -16,6 +16,7 @@ uses for drafting citations, now reused on the analysis side.
 """
 
 import io
+import re
 import logging
 
 from app.schemas import InformationRequest
@@ -76,12 +77,26 @@ Labels:
 Rules: decide only from the passages, never from what a PIO usually does. For every label \
 except NON_RESPONSIVE and INSUFFICIENT_EVIDENCE, list the ids of the passages that show it. \
 When unsure, use INSUFFICIENT_EVIDENCE and give abstention_reason. "explanation" is one plain \
-sentence for the citizen.
+sentence for the citizen. "summary" is 2 to 4 short sentences in plain, everyday words for the \
+citizen: what the reply gave, what it says will come later, and what it refused or skipped.
 
 Respond with ONLY one JSON object, no prose, no markdown fences:
-{"results": [{"request_id": "RQ-001", "label": "...", "explanation": "...", \
+{"summary": "...", "results": [{"request_id": "RQ-001", "label": "...", "explanation": "...", \
 "evidence": ["P-1"], "abstention_reason": null}, ...]}
 One result per request, using the request ids given."""
+
+# When the citizen did not say what they asked (the reply came from an RTI not drafted here),
+# the points come from the reply itself.
+POINTS_PROMPT = SYSTEM_PROMPT.split("Respond with ONLY")[0].replace(
+    "decide, for each information request, how the reply dealt with it.",
+    "find the points it answers. The citizen has not told you what they asked, so take the "
+    "points from the reply itself: its numbered points, or each separate record or topic it "
+    "deals with (at most 10). Give each a short title naming the information, e.g. \"Work order\".",
+) + """Respond with ONLY one JSON object, no prose, no markdown fences:
+{"summary": "...", "points": [{"title": "...", "label": "...", "explanation": "...", \
+"evidence": ["P-1"], "abstention_reason": null}, ...]}"""
+MAX_POINTS = 10
+MAX_SUMMARY_CHARS = 1200
 
 
 class UnreadableReply(ValueError):
@@ -128,6 +143,13 @@ def classify_reply(
     requests: list[InformationRequest], passages: list[ResponsePassage]
 ) -> list[ClassificationResult]:
     """One checked result per request, in the order of `requests`."""
+    return analyse_reply(requests, passages)[0]
+
+
+def analyse_reply(
+    requests: list[InformationRequest], passages: list[ResponsePassage]
+) -> tuple[list[ClassificationResult], str | None]:
+    """classify_reply's results, plus the reply in simple words (None if the model gave none)."""
     listed_requests = "\n".join(f"{request.id}: {request.title} (period: {request.period})" for request in requests)
     listed_passages = "\n".join(f"[{passage.id}] (page {passage.page}) {passage.text}" for passage in passages)
     user = f"Information requests:\n{listed_requests}\n\nReply passages:\n{listed_passages[:MAX_PROMPT_CHARS]}"
@@ -138,11 +160,55 @@ def classify_reply(
             raise ValueError(f"Expected {{'results': [...]}}, got: {payload!r}")
     except Exception:
         logger.warning("Reply classification failed; marking every request unanswerable", exc_info=True)
-        return [abstain(request.id, UNAVAILABLE) for request in requests]
+        return [abstain(request.id, UNAVAILABLE) for request in requests], None
 
     by_id = {str(item.get("request_id")): item for item in items if isinstance(item, dict)}
     by_passage = {passage.id: passage for passage in passages}
-    return [_checked(request.id, by_id.get(request.id), by_passage) for request in requests]
+    return [_checked(request.id, by_id.get(request.id), by_passage) for request in requests], _summary(payload)
+
+
+def analyse_reply_points(
+    passages: list[ResponsePassage],
+) -> tuple[list[InformationRequest], list[ClassificationResult], str | None]:
+    """For a reply to an RTI not drafted here, with no questions given: the points the reply
+    answers (as requests RQ-001...), a checked result for each, and the reply in simple words."""
+    listed_passages = "\n".join(f"[{passage.id}] (page {passage.page}) {passage.text}" for passage in passages)
+    try:
+        payload = llm.complete_json(POINTS_PROMPT, f"Reply passages:\n{listed_passages[:MAX_PROMPT_CHARS]}", max_tokens=8000)
+        items = payload.get("points") if isinstance(payload, dict) else None
+        if not isinstance(items, list):
+            raise ValueError(f"Expected {{'points': [...]}}, got: {payload!r}")
+    except Exception:
+        logger.warning("Reading the reply's points failed", exc_info=True)
+        return [], [], None
+
+    by_passage = {passage.id: passage for passage in passages}
+    requests, results = [], []
+    for item in [item for item in items if isinstance(item, dict) and str(item.get("title", "")).strip()][:MAX_POINTS]:
+        request = _request(len(requests) + 1, str(item["title"]))
+        requests.append(request)
+        results.append(_checked(request.id, item, by_passage))
+    return requests, results, _summary(payload)
+
+
+def requests_from_questions(text: str) -> list[InformationRequest]:
+    """The questions a citizen pasted, one request per non-empty line, numbering removed."""
+    lines = [re.sub(r"^\s*(\(?[0-9a-zA-Z]{1,3}[.)]|[-*\u2022])\s+", "", line).strip() for line in text.splitlines()]
+    return [_request(index, line) for index, line in enumerate([line for line in lines if line][:MAX_POINTS], start=1)]
+
+
+def _request(number: int, title: str) -> InformationRequest:
+    return InformationRequest(
+        id=f"RQ-{number:03d}", category="From the reply", title=title[:1000], authority="", period="",
+        quality="good", source="custom",
+    )
+
+
+def _summary(payload: object) -> str | None:
+    summary = payload.get("summary") if isinstance(payload, dict) else None
+    if not isinstance(summary, str) or not summary.strip():
+        return None
+    return summary.strip()[:MAX_SUMMARY_CHARS]
 
 
 def _checked(request_id: str, item: dict | None, by_passage: dict[str, ResponsePassage]) -> ClassificationResult:

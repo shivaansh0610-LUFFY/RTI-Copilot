@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import Field
 
 from app.schemas.base import ApiModel
+from app.schemas.requests import InformationRequest
 
 # Mirrors ClassificationLabel in src/types.ts. Change both together.
 ClassificationLabel = Literal[
@@ -52,6 +53,11 @@ class ResponseAnalysis(ApiModel):
     ocr_used: bool = False  # true when at least one page had no selectable text and was OCR'd
     passages: list[ResponsePassage]
     results: list[ClassificationResult]
+    # The reply in simple words, from the same AI call; absent when the model gave none.
+    summary: str | None = None
+    # Only for a reply to an RTI not drafted here: the requests the results are for (the
+    # citizen's pasted questions, or the points read from the reply itself).
+    requests: list[InformationRequest] | None = None
 
 
 class AppealItem(ApiModel):

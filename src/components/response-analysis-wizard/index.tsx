@@ -5,6 +5,7 @@ import type {
   ClassificationResult,
   FiledCase,
   FollowUpContext,
+  InformationRequest,
   ResponsePassage,
 } from "../../types";
 import { ANALYSIS_STEPS, MOCK_ORIGINAL_REQUESTS, type StepId } from "./constants";
@@ -12,6 +13,8 @@ import {
   alignRequests,
   analyseResponse,
   canAnalyseForReal,
+  canAnalyseWithoutDraft,
+  startReplyCase,
   classifyResponse,
   draftAppeal,
   ingestResponse,
@@ -36,9 +39,18 @@ export default function ResponseAnalysisWizard({
   filedCase?: FiledCase;
   onFileFollowUp: (followUp: FollowUpContext) => void;
 }) {
-  const caseId = filedCase?.caseId;
-  const isReal = canAnalyseForReal(caseId);
-  const requests = isReal && filedCase ? filedCase.requests : MOCK_ORIGINAL_REQUESTS;
+  const draftedCaseId = filedCase?.caseId;
+  const fromDraft = canAnalyseForReal(draftedCaseId);
+  // A reply to an RTI not drafted here: analysed for real too, on a case of its own, against
+  // the questions the citizen pastes or else the points read from the reply.
+  const direct = !fromDraft && canAnalyseWithoutDraft();
+  const isReal = fromDraft || direct;
+  const [directCaseId, setDirectCaseId] = useState<string>();
+  const [directRequests, setDirectRequests] = useState<InformationRequest[]>([]);
+  const [questions, setQuestions] = useState("");
+  const [summary, setSummary] = useState<string>();
+  const caseId = fromDraft ? draftedCaseId : directCaseId;
+  const requests = fromDraft && filedCase ? filedCase.requests : direct ? directRequests : MOCK_ORIGINAL_REQUESTS;
 
   const [step, setStep] = useState<StepId>("upload");
   const stepIndex = ANALYSIS_STEPS.findIndex((s) => s.id === step);
@@ -75,10 +87,20 @@ export default function ResponseAnalysisWizard({
     setIsProcessing(true);
     setProcessingError("");
     const processed = isReal
-      ? analyseResponse(caseId, file).then((analysis) => {
-          setRealResults(analysis.results);
-          return analysis;
-        })
+      ? (fromDraft ? Promise.resolve(draftedCaseId!) : (directCaseId ? Promise.resolve(directCaseId) : startReplyCase()))
+          .then((id) => {
+            if (direct) setDirectCaseId(id);
+            return analyseResponse(id, file, direct ? questions : undefined);
+          })
+          .then((analysis) => {
+            if (direct && analysis.results.length === 0) {
+              throw new Error("We couldn't read the points of this reply. Paste what you asked, or try again in a minute.");
+            }
+            setRealResults(analysis.results);
+            if (direct) setDirectRequests(analysis.requests ?? []);
+            setSummary(analysis.summary);
+            return analysis;
+          })
       : ingestResponse(file);
     processed
       .then((result) =>
@@ -136,9 +158,11 @@ export default function ResponseAnalysisWizard({
         title="Analyse the reply"
         accent="reply"
         intro={
-          isReal
+          fromDraft
             ? `Upload the reply you received. Each of your ${requests.length} request${requests.length === 1 ? " is" : "s are"} checked against it.`
-            : "Upload the PIO's reply to see what was answered, dodged or refused, with the line of the reply each finding rests on."
+            : direct
+              ? "Got a reply from PWD, or from any Public Information Officer? Upload it. You don't need to have drafted your RTI here."
+              : "Upload the PIO's reply to see what was answered, dodged or refused, with the line of the reply each finding rests on."
         }
       />
 
@@ -158,6 +182,8 @@ export default function ResponseAnalysisWizard({
         <StepCardBody>
           {step === "upload" && (
             <UploadStep
+              questions={direct ? questions : undefined}
+              onQuestionsChange={setQuestions}
               file={file}
               onFileSelect={selectFile}
               onProcess={handleProcess}
@@ -172,7 +198,12 @@ export default function ResponseAnalysisWizard({
           )}
 
           {step === "classify" && (
-            <ClassifyStep requests={requests} results={classifications} passages={ingestResult?.passages ?? []} />
+            <ClassifyStep
+              requests={requests}
+              results={classifications}
+              passages={ingestResult?.passages ?? []}
+              summary={summary}
+            />
           )}
 
           {step === "summary" && (
@@ -181,7 +212,7 @@ export default function ResponseAnalysisWizard({
               results={classifications}
               onFileFollowUp={onFileFollowUp}
               onDraftAppeal={
-                isReal ? (items: AppealItem[]) => draftAppeal(caseId, items) : undefined
+                isReal && caseId ? (items: AppealItem[]) => draftAppeal(caseId, items) : undefined
               }
             />
           )}

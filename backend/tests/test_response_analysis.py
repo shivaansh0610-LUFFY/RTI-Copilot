@@ -291,3 +291,124 @@ def test_appeal_endpoint(client, case_id):
     assert response.status_code == 200
     assert "Section 19(1)" in response.json()["appealText"]
     assert client.post(f"/cases/{case_id}/appeal", json={"items": []}).status_code == 422
+
+
+# --- the reply in simple words, and replies to RTIs not drafted here -------------------------
+
+
+def test_the_summary_comes_from_the_same_call(monkeypatch, passages):
+    fake_model(
+        monkeypatch,
+        {
+            "summary": "  They sent the work order. They have no expenditure record.  ",
+            "results": [{"request_id": "RQ-001", "label": "RESPONSIVE", "explanation": "Given.", "evidence": ["P-2"]}],
+        },
+    )
+
+    results, summary = response_analysis.analyse_reply(REQUESTS[:1], passages)
+
+    assert results[0].label == "RESPONSIVE"
+    assert summary == "They sent the work order. They have no expenditure record."
+
+
+@pytest.mark.parametrize("payload", [{"results": []}, {"summary": "", "results": []}, {"summary": 3, "results": []}])
+def test_no_usable_summary_means_none(monkeypatch, passages, payload):
+    fake_model(monkeypatch, payload)
+
+    assert response_analysis.analyse_reply(REQUESTS[:1], passages)[1] is None
+
+
+def test_pasted_questions_become_requests_without_their_numbers():
+    requests = response_analysis.requests_from_questions(
+        "1. Copy of the work order\n\n2) Measurement Book entries\n- Bills paid\n(a) Inspection report\nPlain line"
+    )
+
+    assert [r.id for r in requests] == ["RQ-001", "RQ-002", "RQ-003", "RQ-004", "RQ-005"]
+    assert [r.title for r in requests] == [
+        "Copy of the work order", "Measurement Book entries", "Bills paid", "Inspection report", "Plain line",
+    ]
+    assert response_analysis.requests_from_questions("  \n \n") == []
+
+
+def test_without_questions_the_points_come_from_the_reply(monkeypatch, passages):
+    fake_model(
+        monkeypatch,
+        {
+            "summary": "They sent the work order and want Rs 40 for the rest.",
+            "points": [
+                {"title": "Work order", "label": "RESPONSIVE", "explanation": "Enclosed.", "evidence": ["P-2"]},
+                {"title": "Expenditure", "label": "NO_RECORD_STATED", "explanation": "Not held.", "evidence": ["P-3"]},
+                {"title": "  ", "label": "RESPONSIVE", "explanation": "No title: dropped."},
+                {"title": "Inspection report", "label": "FEE_DEMANDED", "explanation": "Pay first.", "evidence": ["P-99"]},
+            ],
+        },
+    )
+
+    requests, results, summary = response_analysis.analyse_reply_points(passages)
+
+    assert [(r.id, r.title) for r in requests] == [("RQ-001", "Work order"), ("RQ-002", "Expenditure"), ("RQ-003", "Inspection report")]
+    assert [r.label for r in results] == ["RESPONSIVE", "NO_RECORD_STATED", "INSUFFICIENT_EVIDENCE"]  # P-99 is not in the reply
+    assert summary.startswith("They sent")
+
+
+def test_reading_the_points_failing_gives_nothing_rather_than_guesses(monkeypatch, passages):
+    def broken(*args, **kwargs):
+        raise TimeoutError("model busy")
+
+    monkeypatch.setattr(response_analysis.llm, "complete_json", broken)
+
+    assert response_analysis.analyse_reply_points(passages) == ([], [], None)
+
+
+def test_a_reply_to_an_rti_not_drafted_here_is_checked_against_pasted_questions(client, case_id, monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    fake_model(
+        monkeypatch,
+        {
+            "summary": "They sent the work order.",
+            "results": [
+                {"request_id": "RQ-001", "label": "RESPONSIVE", "explanation": "Given.", "evidence": ["P-2"]},
+                {"request_id": "RQ-002", "label": "NON_RESPONSIVE", "explanation": "Skipped."},
+            ],
+        },
+    )
+
+    response = client.post(
+        f"/cases/{case_id}/response",
+        files={"file": ("reply.txt", "\n\n".join(REPLY_LINES).encode(), "text/plain")},
+        data={"questions": "1. Copy of the work order\n2. Amount spent"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["summary"] == "They sent the work order."
+    assert [r["title"] for r in body["requests"]] == ["Copy of the work order", "Amount spent"]
+    assert [r["label"] for r in body["results"]] == ["RESPONSIVE", "NON_RESPONSIVE"]
+
+
+def test_with_no_questions_the_points_are_read_from_the_reply(client, case_id, monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    fake_model(
+        monkeypatch,
+        {"summary": "Work order sent.", "points": [{"title": "Work order", "label": "RESPONSIVE", "explanation": "Sent.", "evidence": ["P-2"]}]},
+    )
+
+    body = upload(client, case_id).json()
+
+    assert [r["title"] for r in body["requests"]] == ["Work order"]
+    assert body["results"][0]["requestId"] == "RQ-001"
+    assert body["summary"] == "Work order sent."
+
+
+def test_a_drafted_case_gets_no_requests_back_but_does_get_the_summary(client, case_id, monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    requests = stored_requests(client, case_id)
+    fake_model(
+        monkeypatch,
+        {"summary": "Nothing useful.", "results": [{"request_id": r["id"], "label": "NON_RESPONSIVE", "explanation": "No."} for r in requests]},
+    )
+
+    body = upload(client, case_id).json()
+
+    assert body["summary"] == "Nothing useful."
+    assert "requests" not in body
