@@ -7,6 +7,7 @@ import type {
 } from "../../types";
 import { MULTI_SELECT_SEPARATOR, PERIOD_OPTIONS, RECORD_TYPES_KEY } from "./constants";
 import { checkLocally } from "./preflight";
+import { apiFetch } from "../../apiFetch";
 
 // Backend calls — each is a single async function. The ones still mocked are a
 // one-line swap for a real API call later: replace the body, keep the signature.
@@ -81,7 +82,7 @@ function relevantRecordTypes(grievance: string): string[] {
 const API_URL: string | undefined = import.meta.env.VITE_API_URL;
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await apiFetch(`${API_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

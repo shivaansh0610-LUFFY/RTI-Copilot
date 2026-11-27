@@ -1,4 +1,5 @@
 import type { DraftReview } from "../../types";
+import { apiFetch } from "../../apiFetch";
 
 const API_URL: string | undefined = import.meta.env.VITE_API_URL;
 
@@ -10,7 +11,7 @@ export class ReviewUnavailable extends Error {}
 // cannot run them.
 export async function reviewDraft(draftText: string): Promise<DraftReview> {
   if (!API_URL) throw new ReviewUnavailable("The PIO review needs the RTI Copilot server.");
-  const response = await fetch(`${API_URL}/review-draft`, {
+  const response = await apiFetch(`${API_URL}/review-draft`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ draftText }),

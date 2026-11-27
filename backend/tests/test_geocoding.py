@@ -116,3 +116,32 @@ def test_reverse_geocode_raises_on_server_error_status(monkeypatch):
 
     with pytest.raises(geocoding.GeocodingError):
         geocoding.reverse_geocode(28.6315, 77.2167)
+
+
+PHOTON_RESPONSE = {
+    "type": "FeatureCollection",
+    "features": [{"type": "Feature", "properties": {"name": "Kitchenware", "street": "Feroze Gandhi Road", "locality": "Lajpat Nagar III", "county": "South East Delhi", "state": "Delhi"}}],
+}
+
+
+def test_when_nominatim_refuses_the_address_comes_from_photon(monkeypatch):
+    # Nominatim blocks free cloud hosts (it answered Render with "629 Unknown Error").
+    calls = []
+
+    def get(url, **kwargs):
+        calls.append(url)
+        if url == geocoding.NOMINATIM_URL:
+            return FakeResponse({}, status_code=629)
+        return FakeResponse(PHOTON_RESPONSE)
+
+    monkeypatch.setattr(httpx, "get", get)
+
+    assert geocoding.reverse_geocode(28.5677, 77.2433) == "Feroze Gandhi Road, Lajpat Nagar III, South East Delhi"
+    assert calls == [geocoding.NOMINATIM_URL, geocoding.PHOTON_URL]
+
+
+def test_when_both_services_fail_the_first_error_is_reported(monkeypatch):
+    monkeypatch.setattr(httpx, "get", lambda url, **k: FakeResponse({}, status_code=503))
+
+    with pytest.raises(geocoding.GeocodingError, match="could not reach the geocoding service"):
+        geocoding.reverse_geocode(28.6, 77.2)

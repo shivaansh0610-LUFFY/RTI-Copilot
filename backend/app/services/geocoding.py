@@ -12,6 +12,9 @@ import time
 import httpx
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
+# Photon (by Komoot, also OpenStreetMap data, also free and keyless) answers when Nominatim
+# refuses: Nominatim blocks the shared addresses of free cloud hosts such as Render.
+PHOTON_URL = "https://photon.komoot.io/reverse"
 USER_AGENT = "RTI-Copilot/0.1 (student OJT project; github.com/shivaansh0610-LUFFY/RTI-Copilot)"
 TIMEOUT_SECONDS = 5.0
 
@@ -39,6 +42,16 @@ def _wait_for_turn() -> None:
 def reverse_geocode(latitude: float, longitude: float) -> str:
     _wait_for_turn()
     try:
+        return _nominatim(latitude, longitude)
+    except GeocodingError as first:
+        try:
+            return _photon(latitude, longitude)
+        except GeocodingError:
+            raise first from None
+
+
+def _nominatim(latitude: float, longitude: float) -> str:
+    try:
         response = httpx.get(
             NOMINATIM_URL,
             params={"format": "jsonv2", "lat": latitude, "lon": longitude, "zoom": 18, "addressdetails": 1},
@@ -56,6 +69,30 @@ def reverse_geocode(latitude: float, longitude: float) -> str:
     if not isinstance(data, dict) or "error" in data or not data.get("display_name"):
         raise GeocodingError(f"no address found for ({latitude}, {longitude})")
     return _short_address(data)
+
+
+def _photon(latitude: float, longitude: float) -> str:
+    try:
+        response = httpx.get(
+            PHOTON_URL,
+            params={"lat": latitude, "lon": longitude, "limit": 1},
+            headers={"User-Agent": USER_AGENT},
+            timeout=TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        features = response.json().get("features") or []
+    except (httpx.HTTPError, ValueError, AttributeError) as error:
+        raise GeocodingError(f"could not reach the fallback geocoding service: {error}") from error
+    if not features or not isinstance(features[0], dict):
+        raise GeocodingError(f"no address found for ({latitude}, {longitude})")
+    place = features[0].get("properties") or {}
+    road = place.get("street") or place.get("name")
+    area = place.get("locality") or place.get("district")
+    city = place.get("city") or place.get("county") or place.get("state")
+    parts = list(dict.fromkeys(part for part in (road, area, city) if part))
+    if not parts:
+        raise GeocodingError(f"no address found for ({latitude}, {longitude})")
+    return ", ".join(parts)
 
 
 def _short_address(data: dict) -> str:
