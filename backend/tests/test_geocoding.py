@@ -145,3 +145,36 @@ def test_when_both_services_fail_the_first_error_is_reported(monkeypatch):
 
     with pytest.raises(geocoding.GeocodingError, match="could not reach the geocoding service"):
         geocoding.reverse_geocode(28.6, 77.2)
+
+
+@pytest.mark.parametrize(
+    "photon_answer",
+    [
+        [],
+        {"features": "none"},
+        {"features": [None]},
+        {"features": [{"properties": "x"}]},
+        {"features": [{"properties": {"street": 12, "name": ["a"], "city": {"x": 1}}}]},
+        {"features": [{"properties": {"street": "   "}}]},
+    ],
+    ids=["list", "features not a list", "feature not an object", "properties not an object", "fields not text", "blank"],
+)
+def test_a_malformed_photon_answer_is_no_address_not_a_server_error(monkeypatch, photon_answer):
+    def get(url, **kwargs):
+        if url == geocoding.NOMINATIM_URL:
+            return FakeResponse({}, status_code=629)
+        return FakeResponse(photon_answer)
+
+    monkeypatch.setattr(httpx, "get", get)
+
+    with pytest.raises(geocoding.GeocodingError):
+        geocoding.reverse_geocode(28.6, 77.2)
+
+
+def test_when_both_fail_the_fallback_outage_is_logged(monkeypatch, caplog):
+    monkeypatch.setattr(httpx, "get", lambda url, **k: FakeResponse({}, status_code=503))
+
+    with pytest.raises(geocoding.GeocodingError):
+        geocoding.reverse_geocode(28.6, 77.2)
+
+    assert "Both geocoders failed" in caplog.text and "Photon" in caplog.text

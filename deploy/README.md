@@ -87,9 +87,15 @@ From then on, every push to `main` that passes CI redeploys the API by itself.
    the built-in sample data.
 4. Deploy. Every push to `main` rebuilds the site.
 
-The API only answers the site address in `CORS_ORIGINS` in [`render.yaml`](../render.yaml), in
-exactly this form: `["https://the-address.vercel.app"]`. If the site's address changes, change it
-there, not only in Render's dashboard, which a later Blueprint sync can overwrite.
+The API answers only these site addresses, both set in [`render.yaml`](../render.yaml):
+
+- `CORS_ORIGINS`: the exact addresses, as a JSON list: `["https://the-address.vercel.app"]`.
+- `CORS_ORIGIN_REGEX`: a pattern for the rest. Here it allows the production domain and each
+  deployment's own Vercel address (`rti-copilot-app01-<id>-shivaanshs-projects-7cc11c27.vercel.app`,
+  the one Vercel's dashboard shows under Deployment), and nothing else.
+
+If the site's address changes, change them there, not only in Render's dashboard, which a later
+Blueprint sync can overwrite.
 
 ## 5. Check it works
 
@@ -101,7 +107,9 @@ On the live site:
 3. Analyse the reply: upload `demo/sample-pio-reply.pdf` and get the findings and an appeal.
 
 If the site shows sample answers, `VITE_API_URL` is missing (redeploy after setting it). If every
-request fails, `CORS_ORIGINS` does not match the site's address exactly.
+request fails at once with "Failed to fetch", the site's address matches neither `CORS_ORIGINS`
+nor `CORS_ORIGIN_REGEX`. If requests fail only after a long wait, the server did not wake up:
+check its Logs in Render.
 
 ## 6. Keep `main` tested
 
@@ -112,8 +120,15 @@ passing the tests.
 
 ## Good to know
 
-- **Sleep:** the free Render service sleeps after 15 minutes without visitors; the next visit
-  wakes it, which takes about a minute. Neon also pauses when idle and wakes in about a second.
+- **Sleep:** the free Render service sleeps after 15 minutes without visitors, and waking it
+  takes about a minute. The "Keep the API awake" workflow (`.github/workflows/keep-awake.yml`)
+  asks for `/health` every 10 minutes so it rarely sleeps (one always-on free service fits in
+  Render's 750 free hours a month). If it does sleep, the site waits for it: a request that fails
+  while the server is down is sent again once `/health` answers (`src/apiFetch.ts`). Neon also
+  pauses when idle and wakes in about a second.
+- **Location:** the map pin's address comes from OpenStreetMap's Nominatim. It refuses free
+  cloud hosts like Render, so the server then asks Photon (Komoot's free OpenStreetMap service)
+  instead. Only the pin's coordinates are sent to either.
 - **Scanned replies are slow:** the free server has a tenth of a CPU, and reading a scanned page
   (OCR) takes about a minute per page there, even at the lower resolution it uses (`OCR_DPI`
   200 in `render.yaml`; 300 elsewhere). Replies with real text (most PDFs from the online RTI
