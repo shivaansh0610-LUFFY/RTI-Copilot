@@ -31,12 +31,17 @@ export function canAnalyseWithoutDraft(): boolean {
   return Boolean(API_URL);
 }
 
-// POST /cases: an empty case to hang a reply to an RTI not drafted here on.
-export async function startReplyCase(): Promise<string> {
+// POST /cases: a case for a reply to an RTI not drafted here. What is known of that RTI (the
+// questions, if pasted) is its grievance text, so an appeal drafted later has the real context.
+export async function startReplyCase(questions = ""): Promise<string> {
+  const asked = questions.trim();
+  const grievanceText = asked
+    ? `An RTI application not drafted on RTI Copilot. It asked:\n${asked}`.slice(0, 5000)
+    : "An RTI application not drafted on RTI Copilot. Its questions are not known; the findings are the points of the PIO's reply.";
   const response = await apiFetch(`${API_URL}/cases`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ grievanceText: "Analysing a reply from a Public Information Officer." }),
+    body: JSON.stringify({ grievanceText }),
   });
   if (!response.ok) throw await failure(response);
   const { caseId } = (await response.json()) as { caseId: string };
@@ -56,11 +61,18 @@ export async function analyseResponse(caseId: string, file: File, questions?: st
 }
 
 // POST /cases/:id/appeal: a Section 19(1) first appeal for the requests not properly answered.
-export async function draftAppeal(caseId: string, items: AppealItem[]): Promise<string> {
+// For a reply to an RTI not drafted here: who sent it (the appeal goes to that office's
+// appellate authority, not PWD's), and whether the items are points read from the reply.
+export interface AppealFor {
+  authority?: string;
+  fromReply?: boolean;
+}
+
+export async function draftAppeal(caseId: string, items: AppealItem[], appealFor?: AppealFor): Promise<string> {
   const response = await apiFetch(`${API_URL}/cases/${caseId}/appeal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items, ...appealFor }),
   });
   if (!response.ok) throw await failure(response);
   const { appealText } = (await response.json()) as { appealText: string };

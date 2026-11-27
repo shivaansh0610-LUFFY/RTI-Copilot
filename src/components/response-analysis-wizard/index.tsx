@@ -40,7 +40,9 @@ export default function ResponseAnalysisWizard({
   onFileFollowUp: (followUp: FollowUpContext) => void;
 }) {
   const draftedCaseId = filedCase?.caseId;
-  const fromDraft = canAnalyseForReal(draftedCaseId);
+  // Someone who drafted here can still analyse a reply to a different RTI.
+  const [otherRti, setOtherRti] = useState(false);
+  const fromDraft = canAnalyseForReal(draftedCaseId) && !otherRti;
   // A reply to an RTI not drafted here: analysed for real too, on a case of its own, against
   // the questions the citizen pastes or else the points read from the reply.
   const direct = !fromDraft && canAnalyseWithoutDraft();
@@ -49,6 +51,10 @@ export default function ResponseAnalysisWizard({
   const [directRequests, setDirectRequests] = useState<InformationRequest[]>([]);
   const [questions, setQuestions] = useState("");
   const [summary, setSummary] = useState<string>();
+  const [authority, setAuthority] = useState<string>();
+  const [partial, setPartial] = useState(false);
+  // No questions pasted: the findings are about points read from the reply, not the citizen's.
+  const pointsFromReply = direct && directRequests.some((request) => request.category === "Point in the reply");
   const caseId = fromDraft ? draftedCaseId : directCaseId;
   const requests = fromDraft && filedCase ? filedCase.requests : direct ? directRequests : MOCK_ORIGINAL_REQUESTS;
 
@@ -78,6 +84,25 @@ export default function ResponseAnalysisWizard({
 
   function selectFile(next: File | null) {
     setFile(next);
+    startAgain();
+  }
+
+  function changeQuestions(next: string) {
+    setQuestions(next);
+    startAgain();
+  }
+
+  // New inputs after a finished analysis get a case of their own; after a failed one (nothing
+  // saved yet) the same case is used again, so a retry leaves no empty case behind.
+  function startAgain() {
+    if (ingestResult) setDirectCaseId(undefined);
+    setIngestResult(null);
+    setProcessingError("");
+  }
+
+  function analyseOtherRti() {
+    setOtherRti(true);
+    setDirectCaseId(undefined);
     setIngestResult(null);
     setProcessingError("");
   }
@@ -87,7 +112,7 @@ export default function ResponseAnalysisWizard({
     setIsProcessing(true);
     setProcessingError("");
     const processed = isReal
-      ? (fromDraft ? Promise.resolve(draftedCaseId!) : (directCaseId ? Promise.resolve(directCaseId) : startReplyCase()))
+      ? (fromDraft ? Promise.resolve(draftedCaseId!) : directCaseId ? Promise.resolve(directCaseId) : startReplyCase(questions))
           .then((id) => {
             if (direct) setDirectCaseId(id);
             return analyseResponse(id, file, direct ? questions : undefined);
@@ -99,6 +124,8 @@ export default function ResponseAnalysisWizard({
             setRealResults(analysis.results);
             if (direct) setDirectRequests(analysis.requests ?? []);
             setSummary(analysis.summary);
+            setAuthority(analysis.authority);
+            setPartial(Boolean(analysis.partial));
             return analysis;
           })
       : ingestResponse(file);
@@ -176,6 +203,19 @@ export default function ResponseAnalysisWizard({
         </div>
       )}
 
+      {step === "upload" && canAnalyseWithoutDraft() && canAnalyseForReal(draftedCaseId) && (
+        <p className="max-w-3xl text-[14.5px] text-ink-3">
+          {otherRti ? "Analysing a reply to an RTI drafted elsewhere. " : "This checks the reply against the RTI you just drafted. "}
+          <button
+            type="button"
+            onClick={otherRti ? () => { setOtherRti(false); setIngestResult(null); setProcessingError(""); } : analyseOtherRti}
+            className="font-semibold text-ink-blue underline underline-offset-2"
+          >
+            {otherRti ? "Use the RTI I drafted instead" : "The reply is for a different RTI"}
+          </button>
+        </p>
+      )}
+
       <StepProgress steps={ANALYSIS_STEPS} currentId={step} />
 
       <StepCard wide={step === "align" || step === "classify"}>
@@ -183,7 +223,7 @@ export default function ResponseAnalysisWizard({
           {step === "upload" && (
             <UploadStep
               questions={direct ? questions : undefined}
-              onQuestionsChange={setQuestions}
+              onQuestionsChange={changeQuestions}
               file={file}
               onFileSelect={selectFile}
               onProcess={handleProcess}
@@ -194,7 +234,12 @@ export default function ResponseAnalysisWizard({
           )}
 
           {step === "align" && (
-            <AlignStep requests={requests} alignment={alignment} passages={ingestResult?.passages ?? []} />
+            <AlignStep
+              requests={requests}
+              alignment={alignment}
+              passages={ingestResult?.passages ?? []}
+              pointsFromReply={pointsFromReply}
+            />
           )}
 
           {step === "classify" && (
@@ -203,6 +248,7 @@ export default function ResponseAnalysisWizard({
               results={classifications}
               passages={ingestResult?.passages ?? []}
               summary={summary}
+              partial={partial}
             />
           )}
 
@@ -212,7 +258,12 @@ export default function ResponseAnalysisWizard({
               results={classifications}
               onFileFollowUp={onFileFollowUp}
               onDraftAppeal={
-                isReal && caseId ? (items: AppealItem[]) => draftAppeal(caseId, items) : undefined
+                isReal && caseId
+                  ? (items: AppealItem[]) =>
+                      direct
+                        ? draftAppeal(caseId, items, { authority, fromReply: pointsFromReply })
+                        : draftAppeal(caseId, items)
+                  : undefined
               }
             />
           )}

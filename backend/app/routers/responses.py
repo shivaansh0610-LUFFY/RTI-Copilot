@@ -19,11 +19,23 @@ def analyse_response(
     case's stored requests, how the reply dealt with it. The file itself is not stored.
 
     A case with no requests is a reply to an RTI not drafted here: its requests are the
-    `questions` the citizen pasted (one per line), or else the points read from the reply."""
+    `questions` the citizen pasted (one per line), or else the points read from the reply. They
+    are saved to the case, with who sent the reply, so a follow-up RTI or an appeal can use them."""
+    llm_on = get_settings().use_llm_drafting
     requests = case_store.load_requests(case, session=session)
-    pasted = response_analysis.requests_from_questions(questions or "") if not requests else []
-    if not requests and not pasted and not get_settings().use_llm_drafting:
-        raise HTTPException(409, "This case has no information requests yet. Draft the application first.")
+    direct = not requests
+    if direct:
+        requests = response_analysis.requests_from_questions(questions or "")
+        if len(requests) > response_analysis.MAX_QUESTIONS:
+            raise HTTPException(
+                422, f"Paste at most {response_analysis.MAX_QUESTIONS} questions; this has {len(requests)}."
+            )
+        if not requests and not llm_on:
+            raise HTTPException(
+                409,
+                "Reading a reply without your questions needs the AI, which is switched off on this "
+                "server. Paste the questions you asked, or draft the application first.",
+            )
 
     data = file.file.read(response_analysis.MAX_BYTES + 1)
     try:
@@ -31,24 +43,41 @@ def analyse_response(
     except response_analysis.UnreadableReply as error:
         raise HTTPException(422, str(error)) from error
 
-    derived = None
-    summary = None
-    if requests or pasted:
-        derived = None if requests else pasted
-        requests = requests or pasted
-        if get_settings().use_llm_drafting:
-            results, summary = response_analysis.analyse_reply(requests, passages)
-        else:
-            results = [response_analysis.abstain(request.id, AI_OFF) for request in requests]
+    if not requests:
+        reading = response_analysis.analyse_reply_points(passages)
+        if not reading.results:
+            # Nothing is marked analysed: the citizen can paste their questions, or try again.
+            raise HTTPException(
+                422, "We couldn't read the points of this reply. Paste what you asked, or try again in a minute."
+            )
+    elif llm_on:
+        reading = response_analysis.analyse_reply(requests, passages)
     else:
-        derived, results, summary = response_analysis.analyse_reply_points(passages)
+        reading = response_analysis.Reading(
+            requests, [response_analysis.abstain(request.id, AI_OFF) for request in requests]
+        )
 
+    saved = None
+    if direct:
+        saved = response_analysis.for_follow_up(reading.requests, reading.authority)
+        case_store.save_requests(case, saved, session=session, commit=False)
     case_store.update_case(case, session=session, status=case_store.RESPONSE_ANALYSED)
     return ResponseAnalysis(
-        pages=pages, ocr_used=ocr_used, passages=passages, results=results, summary=summary, requests=derived
+        pages=pages,
+        ocr_used=ocr_used,
+        passages=passages,
+        results=reading.results,
+        summary=reading.summary,
+        requests=saved,
+        authority=reading.authority if direct else None,
+        partial=True if reading.partial else None,
     )
 
 
 @router.post("/appeal", response_model=AppealResponse)
 def draft_appeal(case: CaseDep, body: AppealBody) -> AppealResponse:
-    return AppealResponse(appeal_text=appeal.generate_appeal(case.grievance_text, body.items, body.language))
+    return AppealResponse(
+        appeal_text=appeal.generate_appeal(
+            case.grievance_text, body.items, body.language, authority=body.authority, from_reply=body.from_reply
+        )
+    )

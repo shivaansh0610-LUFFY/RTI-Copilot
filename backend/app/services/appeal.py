@@ -51,18 +51,32 @@ Respond with ONLY one JSON object, no prose, no markdown fences: {{"appeal": "<t
 LANGUAGES = {"en": "Write in English.", "hi": "Write in Hindi (Devanagari script)."}
 
 
-def generate_appeal(grievance: str, items: list[AppealItem], language: str = "en") -> str:
+# Said to the model when the items are points read from the PIO's reply (the RTI was not drafted
+# here and the citizen did not paste their questions), so the appeal never claims they asked them.
+FROM_REPLY_NOTE = (
+    "Note: the citizen's original questions are not known. The items are points of the PIO's "
+    "reply. Refer to each as a point of the reply, never as something the citizen asked for."
+)
+
+
+def generate_appeal(
+    grievance: str, items: list[AppealItem], language: str = "en", *, authority: str | None = None, from_reply: bool = False
+) -> str:
+    """The appeal, to the appellate authority of `authority` (the office that sent the reply) or,
+    by default, of PWD Delhi."""
+    authority = authority or AUTHORITY
     if not get_settings().use_llm_drafting:
-        return template_appeal(items)
+        return template_appeal(items, authority)
     listed = "\n".join(
         f"{index}. {item.title} | finding: {LABEL_TEXT.get(item.label, item.label)} | {item.explanation}"
         for index, item in enumerate(items, start=1)
     )
     system = SYSTEM_PROMPT.format(
-        authority=AUTHORITY, count=len(items), language=LANGUAGES.get(language, LANGUAGES["en"])
+        authority=authority, count=len(items), language=LANGUAGES.get(language, LANGUAGES["en"])
     )
+    note = f"\n\n{FROM_REPLY_NOTE}" if from_reply else ""
     try:
-        payload = llm.complete_json(system, f"Grievance:\n{grievance}\n\nItems:\n{listed}", max_tokens=6000)
+        payload = llm.complete_json(system, f"Grievance:\n{grievance}\n\nItems:\n{listed}{note}", max_tokens=6000)
         appeal = payload.get("appeal") if isinstance(payload, dict) else None
         if not isinstance(appeal, str) or not appeal.strip():
             raise ValueError(f"Expected {{'appeal': <text>}}, got: {payload!r}")
@@ -73,16 +87,16 @@ def generate_appeal(grievance: str, items: list[AppealItem], language: str = "en
         return appeal.strip()
     except Exception:
         logger.warning("LLM appeal drafting failed, falling back to the template", exc_info=True)
-        return template_appeal(items)
+        return template_appeal(items, authority)
 
 
-def template_appeal(items: list[AppealItem]) -> str:
+def template_appeal(items: list[AppealItem], authority: str = AUTHORITY) -> str:
     grounds = "\n".join(
         f"{index}. {item.title}: {LABEL_TEXT.get(item.label, item.label)}. {item.explanation}"
         for index, item in enumerate(items, start=1)
     )
     return (
-        f"To,\nThe First Appellate Authority,\n{AUTHORITY}\n\n"
+        f"To,\nThe First Appellate Authority,\n{authority}\n\n"
         "Subject: First appeal under Section 19(1) of the Right to Information Act, 2005\n\n"
         "RTI application registration no.: [registration number]\n"
         "Date of application: [date of application]\n"
