@@ -1,6 +1,7 @@
 import pytest
 from corpus_support import make_pdf
 
+from app import case_store
 from app.config import get_settings
 from app.schemas import InformationRequest
 from app.schemas.responses import AppealItem
@@ -305,17 +306,18 @@ def test_the_summary_comes_from_the_same_call(monkeypatch, passages):
         },
     )
 
-    results, summary = response_analysis.analyse_reply(REQUESTS[:1], passages)
+    reading = response_analysis.analyse_reply(REQUESTS[:1], passages)
 
-    assert results[0].label == "RESPONSIVE"
-    assert summary == "They sent the work order. They have no expenditure record."
+    assert reading.results[0].label == "RESPONSIVE"
+    assert reading.summary == "They sent the work order. They have no expenditure record."
+    assert reading.partial is False
 
 
 @pytest.mark.parametrize("payload", [{"results": []}, {"summary": "", "results": []}, {"summary": 3, "results": []}])
 def test_no_usable_summary_means_none(monkeypatch, passages, payload):
     fake_model(monkeypatch, payload)
 
-    assert response_analysis.analyse_reply(REQUESTS[:1], passages)[1] is None
+    assert response_analysis.analyse_reply(REQUESTS[:1], passages).summary is None
 
 
 def test_pasted_questions_become_requests_without_their_numbers():
@@ -327,6 +329,9 @@ def test_pasted_questions_become_requests_without_their_numbers():
     assert [r.title for r in requests] == [
         "Copy of the work order", "Measurement Book entries", "Bills paid", "Inspection report", "Plain line",
     ]
+    assert {r.category for r in requests} == {"Your question"}
+    # Every question is kept, however many: the endpoint refuses too many rather than dropping some.
+    assert len(response_analysis.requests_from_questions("\n".join(f"{n}. Q{n}" for n in range(1, 41)))) == 40
     assert response_analysis.requests_from_questions("  \n \n") == []
 
 
@@ -344,11 +349,14 @@ def test_without_questions_the_points_come_from_the_reply(monkeypatch, passages)
         },
     )
 
-    requests, results, summary = response_analysis.analyse_reply_points(passages)
+    reading = response_analysis.analyse_reply_points(passages)
 
-    assert [(r.id, r.title) for r in requests] == [("RQ-001", "Work order"), ("RQ-002", "Expenditure"), ("RQ-003", "Inspection report")]
-    assert [r.label for r in results] == ["RESPONSIVE", "NO_RECORD_STATED", "INSUFFICIENT_EVIDENCE"]  # P-99 is not in the reply
-    assert summary.startswith("They sent")
+    assert [(r.id, r.title) for r in reading.requests] == [("RQ-001", "Work order"), ("RQ-002", "Expenditure"), ("RQ-003", "Inspection report")]
+    assert [r.label for r in reading.results] == ["RESPONSIVE", "NO_RECORD_STATED", "INSUFFICIENT_EVIDENCE"]  # P-99 is not in the reply
+    assert reading.summary.startswith("They sent")
+    # Marked as read from the reply, so nothing later presents them as the citizen's questions.
+    assert {r.category for r in reading.requests} == {"Point in the reply"}
+    assert all("not known" in r.context for r in reading.requests)
 
 
 def test_reading_the_points_failing_gives_nothing_rather_than_guesses(monkeypatch, passages):
@@ -357,10 +365,11 @@ def test_reading_the_points_failing_gives_nothing_rather_than_guesses(monkeypatc
 
     monkeypatch.setattr(response_analysis.llm, "complete_json", broken)
 
-    assert response_analysis.analyse_reply_points(passages) == ([], [], None)
+    reading = response_analysis.analyse_reply_points(passages)
+    assert (reading.requests, reading.results, reading.summary) == ([], [], None)
 
 
-def test_a_reply_to_an_rti_not_drafted_here_is_checked_against_pasted_questions(client, case_id, monkeypatch):
+def test_a_reply_to_an_rti_not_drafted_here_is_checked_against_pasted_questions(client, case_id, db_engine, monkeypatch):
     monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
     fake_model(
         monkeypatch,
@@ -384,6 +393,10 @@ def test_a_reply_to_an_rti_not_drafted_here_is_checked_against_pasted_questions(
     assert body["summary"] == "They sent the work order."
     assert [r["title"] for r in body["requests"]] == ["Copy of the work order", "Amount spent"]
     assert [r["label"] for r in body["results"]] == ["RESPONSIVE", "NON_RESPONSIVE"]
+    # Saved with the case, ready for a follow-up RTI to the office that replied.
+    assert {r["authority"] for r in body["requests"]} == {response_analysis.UNKNOWN_AUTHORITY}
+    assert {r["period"] for r in body["requests"]} == {response_analysis.ORIGINAL_PERIOD}
+    assert [r.title for r in stored(db_engine, case_id)[1]] == ["Copy of the work order", "Amount spent"]
 
 
 def test_with_no_questions_the_points_are_read_from_the_reply(client, case_id, monkeypatch):
@@ -412,3 +425,88 @@ def test_a_drafted_case_gets_no_requests_back_but_does_get_the_summary(client, c
 
     assert body["summary"] == "Nothing useful."
     assert "requests" not in body
+
+
+
+def test_the_office_that_replied_gets_the_follow_up_and_the_appeal(client, case_id, monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    fake_model(
+        monkeypatch,
+        {"summary": "Sent.", "authority": "Delhi Jal Board", "points": [{"title": "Water bills", "label": "RESPONSIVE", "explanation": "Sent.", "evidence": ["P-2"]}]},
+    )
+
+    body = upload(client, case_id).json()
+
+    assert body["authority"] == "Delhi Jal Board"
+    assert body["requests"][0]["authority"] == "Delhi Jal Board"
+    assert body["requests"][0]["category"] == "Point in the reply"
+
+
+def test_too_many_pasted_questions_are_refused_not_cut(client, case_id, monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    questions = "\n".join(f"{n}. Question {n}" for n in range(1, 32))
+
+    response = client.post(
+        f"/cases/{case_id}/response",
+        files={"file": ("reply.txt", "\n\n".join(REPLY_LINES).encode(), "text/plain")},
+        data={"questions": questions},
+    )
+
+    assert response.status_code == 422
+    assert "at most 30" in response.json()["detail"]
+
+
+def test_points_that_cannot_be_read_leave_the_case_unanalysed(client, case_id, db_engine, monkeypatch):
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    fake_model(monkeypatch, {"points": []})
+
+    response = upload(client, case_id)
+
+    assert response.status_code == 422
+    assert "Paste what you asked" in response.json()["detail"]
+    case, requests = stored(db_engine, case_id)
+    assert case.status != case_store.RESPONSE_ANALYSED and requests == []
+
+
+def test_without_ai_a_reply_needs_the_questions(client, case_id):
+    response = upload(client, case_id)
+
+    assert response.status_code == 409
+    assert "Paste the questions" in response.json()["detail"]
+
+
+def test_a_long_reply_is_flagged_as_only_partly_read(monkeypatch):
+    monkeypatch.setattr(response_analysis, "MAX_PROMPT_CHARS", 50)
+    fake_model(monkeypatch, {"summary": "Short.", "results": []})
+    long_passages = read_reply("reply.txt", "\n\n".join(REPLY_LINES * 3).encode())[1]
+
+    assert response_analysis.analyse_reply(REQUESTS[:1], long_passages).partial is True
+
+
+def test_an_appeal_goes_to_the_office_that_replied(monkeypatch):
+    seen = {}
+
+    def model(system, user, **kwargs):
+        seen["system"], seen["user"] = system, user
+        return {"appeal": "To, ...\n1. Water bills"}
+
+    monkeypatch.setattr(get_settings(), "use_llm_drafting", True)
+    monkeypatch.setattr(appeal.llm, "complete_json", model)
+    item = AppealItem(request_id="RQ-001", title="Water bills", label="NON_RESPONSIVE", explanation="Skipped.")
+
+    appeal.generate_appeal("A reply", [item], authority="Delhi Jal Board", from_reply=True)
+
+    assert "Delhi Jal Board" in seen["system"] and "Public Works Department" not in seen["system"]
+    assert appeal.FROM_REPLY_NOTE in seen["user"]
+    assert "Delhi Jal Board" in appeal.template_appeal([item], "Delhi Jal Board")
+
+
+def stored(db_engine, case_id):
+    """The case row and its saved requests, read straight from the database."""
+    from uuid import UUID
+
+    from sqlalchemy.orm import Session
+
+    with Session(db_engine, expire_on_commit=False) as session:
+        case = case_store.get_case(UUID(case_id), session=session)
+        return case, case_store.load_requests(case, session=session)

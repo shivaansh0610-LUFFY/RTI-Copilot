@@ -118,6 +118,10 @@ export interface ResponseAnalysis {
   // Only for a reply to an RTI not drafted here: what the results are for (the pasted
   // questions, or the points read from the reply itself).
   requests?: InformationRequest[];
+  // Only for such a reply: the office that sent it, as named on it.
+  authority?: string;
+  // The reply was longer than the AI reads at once, so only its first part was analysed.
+  partial?: boolean;
 }
 
 export interface AppealItem {

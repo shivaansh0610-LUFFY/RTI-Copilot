@@ -91,6 +91,7 @@ export function UploadStep({
         <input
           id="response-file"
           type="file"
+          disabled={isProcessing}
           accept=".pdf,.txt"
           className="hidden"
           onChange={(e) => onFileSelect(e.target.files?.[0] ?? null)}
@@ -112,7 +113,7 @@ export function UploadStep({
             onChange={(e) => onQuestionsChange?.(e.target.value)}
             rows={4}
             maxLength={5000}
-            disabled={Boolean(ingestResult)}
+            disabled={Boolean(ingestResult) || isProcessing}
             placeholder={"e.g. 1. Copy of the work order for the repair of Ring Road\n2. Copies of the Measurement Book entries"}
             className="rounded-lg border border-edge-strong bg-white px-4 py-3 font-serif text-[15px] leading-relaxed text-ink"
           />
@@ -180,10 +181,13 @@ export function AlignStep({
   requests,
   alignment,
   passages,
+  pointsFromReply = false,
 }: {
   requests: InformationRequest[];
   alignment: Record<string, ResponsePassage[]>;
   passages: ResponsePassage[];
+  // The "requests" are points read from the reply, not questions the citizen sent.
+  pointsFromReply?: boolean;
 }) {
   const [showExtractedText, setShowExtractedText] = useState(false);
   return (
@@ -213,7 +217,7 @@ export function AlignStep({
 
       <ol aria-label="Your requests and the lines of the reply matched to them" className="paper-sheet">
         <li aria-hidden="true" className="hidden border-b-2 border-ink lg:grid lg:grid-cols-2">
-          <span className="paper-label px-7 py-3 text-brown">Your request</span>
+          <span className="paper-label px-7 py-3 text-brown">{pointsFromReply ? "Point in the reply" : "Your request"}</span>
           <span className="paper-label border-l-2 border-l-stamp/35 px-7 py-3 text-brown">What the reply says</span>
         </li>
         {requests.map((request, index) => {
@@ -253,11 +257,13 @@ export function ClassifyStep({
   results,
   passages,
   summary,
+  partial = false,
 }: {
   requests: InformationRequest[];
   results: Record<string, ClassificationResult>;
   passages: ResponsePassage[];
   summary?: string;
+  partial?: boolean;
 }) {
   const findings = requests
     .map((request, index) => ({ request, n: index + 1, result: results[request.id] }))
@@ -287,6 +293,11 @@ export function ClassifyStep({
           <p className="mt-3 max-w-[58em] font-serif text-[16.5px] leading-[1.7] text-ink sm:text-[18px]">{summary}</p>
           <p className="mt-3 text-[13px] text-muted">Written by AI from the reply. Check it against the reply below.</p>
         </section>
+      )}
+      {partial && (
+        <p className="rounded-md border border-[#f2d49b] bg-[#fff8e6] px-4 py-3 text-[14px] text-[#7a4508]">
+          This reply is long: only its first part was read. Check the rest of it yourself.
+        </p>
       )}
       <p aria-hidden="true" className="flex flex-wrap gap-x-5 gap-y-2 text-[13.5px] text-ink-3">
         <span><span className="hl hl-good">Answered</span></span>

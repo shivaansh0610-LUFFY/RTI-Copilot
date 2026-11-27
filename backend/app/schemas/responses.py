@@ -58,6 +58,10 @@ class ResponseAnalysis(ApiModel):
     # Only for a reply to an RTI not drafted here: the requests the results are for (the
     # citizen's pasted questions, or the points read from the reply itself).
     requests: list[InformationRequest] | None = None
+    # Only for such a reply: the authority that sent it, as named on it (None: not stated).
+    authority: str | None = None
+    # True when the reply was longer than the model reads, so only its start was analysed.
+    partial: bool | None = None
 
 
 class AppealItem(ApiModel):
@@ -70,6 +74,11 @@ class AppealItem(ApiModel):
 class AppealBody(ApiModel):
     items: list[AppealItem] = Field(min_length=1, max_length=20)
     language: Literal["en", "hi"] = "en"
+    # For a reply to an RTI not drafted here: who sent it (else the appeal goes to PWD Delhi's
+    # appellate authority), and whether the items are points read from the reply rather than
+    # the citizen's own questions.
+    authority: str | None = Field(default=None, max_length=300)
+    from_reply: bool = False
 
 
 class AppealResponse(ApiModel):
