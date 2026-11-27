@@ -4,8 +4,13 @@ unlike Google Maps' Geocoding API.
 Usage policy (https://operations.osmfoundation.org/policies/nominatim/) requires a real,
 identifying User-Agent header; never remove it. This app's volume is far below the policy's
 rate limit (1 request/second), so no separate throttling is implemented here.
+
+When Nominatim refuses (it blocks the shared addresses of free cloud hosts), the same
+coordinates go to Photon instead: a second free OpenStreetMap service, run by Komoot. Only the
+coordinates of the pin are sent, as to Nominatim.
 """
 
+import logging
 import threading
 import time
 
@@ -17,6 +22,9 @@ NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 PHOTON_URL = "https://photon.komoot.io/reverse"
 USER_AGENT = "RTI-Copilot/0.1 (student OJT project; github.com/shivaansh0610-LUFFY/RTI-Copilot)"
 TIMEOUT_SECONDS = 5.0
+
+
+logger = logging.getLogger(__name__)
 
 
 class GeocodingError(Exception):
@@ -46,7 +54,9 @@ def reverse_geocode(latitude: float, longitude: float) -> str:
     except GeocodingError as first:
         try:
             return _photon(latitude, longitude)
-        except GeocodingError:
+        except GeocodingError as second:
+            # Logged, or an outage of the fallback would hide behind Nominatim's error.
+            logger.warning("Both geocoders failed: Nominatim (%s), then Photon (%s)", first, second)
             raise first from None
 
 
@@ -80,19 +90,26 @@ def _photon(latitude: float, longitude: float) -> str:
             timeout=TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        features = response.json().get("features") or []
-    except (httpx.HTTPError, ValueError, AttributeError) as error:
+        payload = response.json()
+    except (httpx.HTTPError, ValueError) as error:
         raise GeocodingError(f"could not reach the fallback geocoding service: {error}") from error
-    if not features or not isinstance(features[0], dict):
+    # Any other shape than the documented GeoJSON is "no address", never a server error.
+    features = payload.get("features") if isinstance(payload, dict) else None
+    first = features[0] if isinstance(features, list) and features else None
+    place = first.get("properties") if isinstance(first, dict) else None
+    if not isinstance(place, dict):
         raise GeocodingError(f"no address found for ({latitude}, {longitude})")
-    place = features[0].get("properties") or {}
-    road = place.get("street") or place.get("name")
-    area = place.get("locality") or place.get("district")
-    city = place.get("city") or place.get("county") or place.get("state")
+    road = _text(place.get("street")) or _text(place.get("name"))
+    area = _text(place.get("locality")) or _text(place.get("district"))
+    city = _text(place.get("city")) or _text(place.get("county")) or _text(place.get("state"))
     parts = list(dict.fromkeys(part for part in (road, area, city) if part))
     if not parts:
         raise GeocodingError(f"no address found for ({latitude}, {longitude})")
     return ", ".join(parts)
+
+
+def _text(value: object) -> str | None:
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 def _short_address(data: dict) -> str:
