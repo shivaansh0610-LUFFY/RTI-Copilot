@@ -37,6 +37,10 @@ services:
         value: "false"
       - key: CORS_ORIGINS
         value: '["https://rti-copilot-app01.vercel.app"]'
+      # And each deployment's own Vercel address (shown in Vercel's dashboard), so opening the
+      # site from there does not fail with "Failed to fetch".
+      - key: CORS_ORIGIN_REGEX
+        value: 'https://rti-copilot-app01(-[a-z0-9-]+-shivaanshs-projects-7cc11c27)?\.vercel\.app'
       # Scanned replies read at 200 dpi instead of 300: about a minute a page on a tenth of a CPU
       # instead of a minute and a half, with the same words read in testing (ingest/extract.py).
       - key: OCR_DPI

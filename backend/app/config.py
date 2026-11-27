@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     cloudflare_account_id: str = ""
     cloudflare_api_token: str = ""
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # Also allowed: browser origins matching this regular expression, e.g. every Vercel address of
+    # the site (the production domain plus each deployment's own URL). Empty: none.
+    cors_origin_regex: str = ""
 
 
 @lru_cache

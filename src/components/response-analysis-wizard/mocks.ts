@@ -1,3 +1,4 @@
+import { apiFetch } from "../../apiFetch";
 import type {
   AppealItem,
   ClassificationResult,
@@ -29,14 +30,14 @@ async function failure(response: Response): Promise<Error> {
 export async function analyseResponse(caseId: string, file: File): Promise<ResponseAnalysis> {
   const form = new FormData();
   form.append("file", file);
-  const response = await fetch(`${API_URL}/cases/${caseId}/response`, { method: "POST", body: form });
+  const response = await apiFetch(`${API_URL}/cases/${caseId}/response`, { method: "POST", body: form });
   if (!response.ok) throw await failure(response);
   return response.json();
 }
 
 // POST /cases/:id/appeal: a Section 19(1) first appeal for the requests not properly answered.
 export async function draftAppeal(caseId: string, items: AppealItem[]): Promise<string> {
-  const response = await fetch(`${API_URL}/cases/${caseId}/appeal`, {
+  const response = await apiFetch(`${API_URL}/cases/${caseId}/appeal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items }),
